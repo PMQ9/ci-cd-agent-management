@@ -1,0 +1,46 @@
+# Controls what `gcloud run deploy --source .` uploads to Cloud Build as the
+# build context. NOTE: when this file exists it REPLACES gcloud's default
+# .gitignore fallback, so everything to exclude must be listed here explicitly.
+#
+# Do NOT add the files the Dockerfile COPYs: pnpm-workspace.yaml, package.json,
+# tsconfig.base.json, pnpm-lock.yaml, and packages/** source must be uploaded.
+
+# VCS / CI — not needed to build the image
+.git
+.gitignore
+.github
+
+# Dependencies + build outputs (rebuilt inside the image)
+node_modules
+**/node_modules
+dist
+build
+**/dist
+**/build
+*.tsbuildinfo
+
+# Secrets / env (never upload — runtime secrets come from Secret Manager)
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+
+# Runner working dirs (not part of the control-plane image)
+.agentpr/
+work/
+
+# VM-fallback deploy assets + local-dev compose (irrelevant to the Cloud Run image)
+deploy/
+docker-compose.yml
+
+# Logs / OS / editor
+*.log
+logs/
+.DS_Store
+.idea/
+.vscode/
+
+# Planning / scratch
+*.tgz
+coverage/

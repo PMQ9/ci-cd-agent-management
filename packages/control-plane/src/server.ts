@@ -2,10 +2,12 @@ import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
 import { env, isProd } from "./config.js";
 import { registerAuth } from "./auth.js";
+import { sweepExpiredLeases } from "./queue.js";
 import { registerJobRoutes } from "./routes/jobs.js";
 import { registerRepoRoutes } from "./routes/repos.js";
 import { registerRunnerRoutes } from "./routes/runners.js";
 import { registerUsageRoutes } from "./routes/usage.js";
+import { safeEqualHex } from "./util/crypto.js";
 import { registerWebhook } from "./webhook.js";
 
 export async function buildServer(): Promise<FastifyInstance> {
@@ -32,6 +34,24 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/readyz", async () => ({ ok: true }));
+
+  // ── Internal: HTTP-triggered lease sweep ─────────────────────────────────────
+  // Replaces the in-process timer under Cloud Run scale-to-zero (where the timer
+  // can't fire): Cloud Scheduler POSTs here every minute. Guarded by a shared
+  // bearer secret because the service is public (--allow-unauthenticated).
+  app.post("/internal/sweep", async (request, reply) => {
+    if (!env.INTERNAL_API_TOKEN) {
+      return reply.code(404).send({ error: { code: "not_found", message: "Not found" } });
+    }
+    const auth = request.headers.authorization;
+    const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+    if (!token || !safeEqualHex(token, env.INTERNAL_API_TOKEN)) {
+      return reply.code(401).send({ error: { code: "unauthenticated", message: "Bad internal token" } });
+    }
+    const requeued = await sweepExpiredLeases();
+    if (requeued) request.log.info({ requeued }, "swept expired leases (http)");
+    return reply.send({ ok: true, requeued });
+  });
 
   registerAuth(app);
   registerWebhook(app);

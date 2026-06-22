@@ -8,7 +8,7 @@ services:
   control-plane:
     build:
       context: ../..
-      dockerfile: packages/control-plane/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file: ../../.env
     expose:

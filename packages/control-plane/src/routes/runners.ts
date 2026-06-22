@@ -24,8 +24,6 @@ import {
 import { requireUser } from "../auth.js";
 import { safeEqualHex, sha256, randomToken } from "../util/crypto.js";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 type WithRunner = FastifyRequest & { runner?: RunnerRow };
 
 async function requireRunner(request: WithRunner, reply: FastifyReply): Promise<void> {
@@ -70,43 +68,40 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
     return reply.send({ runnerId: runner!.id, runnerToken });
   });
 
-  // ── Long-poll for the next job ───────────────────────────────────────────────
+  // ── Short-poll for the next job (returns immediately) ────────────────────────
+  // Returns immediately with a job or `{ job: null }`; the runner sleeps and
+  // re-polls (see runner POLL_INTERVAL_MS). Long-poll was removed so the control
+  // plane holds no long-lived connections and can run on Cloud Run scale-to-zero.
   app.post("/api/runners/lease", { preHandler: requireRunner }, async (request, reply) => {
     const runner = (request as WithRunner).runner!;
     await touchRunner(runner.id);
 
-    const deadline = Date.now() + env.LONG_POLL_SECONDS * 1000;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const job = await leaseNextJob(runner.id);
-      if (job) {
-        const [repo] = await db.select().from(repos).where(eq(repos.id, job.repoId)).limit(1);
-        if (!repo) {
-          return reply.send({ job: null } satisfies LeaseResponse);
-        }
-        const [owner, name] = repo.fullName.split("/");
-        const githubToken = await mintRepoToken(repo.installationId, name!);
-        const priorFindings = job.round > 1 ? await priorFindingsForPr(repo.id, job.prNumber) : [];
-        const leaseJob: LeaseJob = {
-          jobId: job.id,
-          leaseId: job.leaseId!,
-          repoFullName: repo.fullName,
-          cloneUrl: `https://github.com/${owner}/${name}.git`,
-          prNumber: job.prNumber,
-          headSha: job.headSha,
-          baseSha: job.baseSha,
-          provider: repo.provider,
-          model: repo.model,
-          round: job.round,
-          githubToken,
-          resumeSessionId: job.claudeSessionId,
-          priorFindings,
-        };
-        return reply.send({ job: leaseJob } satisfies LeaseResponse);
-      }
-      if (Date.now() >= deadline) return reply.send({ job: null } satisfies LeaseResponse);
-      await sleep(1000);
+    const job = await leaseNextJob(runner.id);
+    if (!job) return reply.send({ job: null } satisfies LeaseResponse);
+
+    const [repo] = await db.select().from(repos).where(eq(repos.id, job.repoId)).limit(1);
+    if (!repo) {
+      return reply.send({ job: null } satisfies LeaseResponse);
     }
+    const [owner, name] = repo.fullName.split("/");
+    const githubToken = await mintRepoToken(repo.installationId, name!);
+    const priorFindings = job.round > 1 ? await priorFindingsForPr(repo.id, job.prNumber) : [];
+    const leaseJob: LeaseJob = {
+      jobId: job.id,
+      leaseId: job.leaseId!,
+      repoFullName: repo.fullName,
+      cloneUrl: `https://github.com/${owner}/${name}.git`,
+      prNumber: job.prNumber,
+      headSha: job.headSha,
+      baseSha: job.baseSha,
+      provider: repo.provider,
+      model: repo.model,
+      round: job.round,
+      githubToken,
+      resumeSessionId: job.claudeSessionId,
+      priorFindings,
+    };
+    return reply.send({ job: leaseJob } satisfies LeaseResponse);
   });
 
   // ── Report a successful review ───────────────────────────────────────────────

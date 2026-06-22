@@ -6,6 +6,10 @@ control plane (the GCP deployment) — no inbound ports, works behind NAT. You c
 runner on several machines; jobs route to whichever is free, and re-reviews prefer the
 machine that did the original.
 
+The runner **short-polls**: it asks for a job, and if there's none it sleeps
+`POLL_INTERVAL_MS` (~25s) and retries. So `CONTROL_PLANE_URL` points at the Cloud Run
+`*.run.app` URL, and worst-case enqueue→pickup latency is ~`POLL_INTERVAL_MS`.
+
 ## Prerequisites
 - Node 20+ installed.
 - Claude Code logged in via your subscription: `~/.claude/.credentials.json` exists.

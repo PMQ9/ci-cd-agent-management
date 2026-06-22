@@ -23,6 +23,9 @@ ENV DASHBOARD_DIST=/app/packages/dashboard/dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/shared ./packages/shared
 COPY --from=build /app/packages/control-plane/dist ./packages/control-plane/dist
+# The pnpm symlink tree where the control-plane's own deps (drizzle-orm, etc.)
+# resolve. Without this the container crashes on boot with ERR_MODULE_NOT_FOUND.
+COPY --from=build /app/packages/control-plane/node_modules ./packages/control-plane/node_modules
 COPY --from=build /app/packages/control-plane/drizzle ./packages/control-plane/drizzle
 COPY --from=build /app/packages/control-plane/package.json ./packages/control-plane/package.json
 COPY --from=build /app/packages/dashboard/dist ./packages/dashboard/dist

@@ -16,7 +16,7 @@ the paid API.** Split into a **control plane** (always-on orchestration) and **r
 runner. The control plane never holds them.** Everything else follows from this:
 
 - Compute (the `claude -p` call) happens on the **runner**, never the control plane.
-- Runners connect **outbound** (long-poll); the control plane never dials in. This is
+- Runners connect **outbound** (short-poll); the control plane never dials in. This is
   why the queue is pull-based, not a push/WebSocket dispatch.
 - The control plane holds the *GitHub* credentials (App key) and posts the review, so
   GitHub creds also stay off the runner. The runner only gets a short-lived,
@@ -27,9 +27,10 @@ runner. The control plane never holds them.** Everything else follows from this:
 ```
 GitHub ──webhook(HMAC)──▶ control-plane ──┐  posts review (Reviews API)
                           (Fastify+PG)    └──▶ GitHub
-   runner ──long-poll /api/runners/lease──▶ control-plane   (lease: FOR UPDATE SKIP LOCKED)
+   runner ──short-poll /api/runners/lease─▶ control-plane   (lease: FOR UPDATE SKIP LOCKED)
    runner ──POST result/error────────────▶ control-plane   (idempotent on leaseId)
    runner: git worktree checkout → claude -p --output-format json → findings + cost
+   Cloud Scheduler ──POST /internal/sweep─▶ control-plane   (requeue dead leases; scale-to-zero)
 ```
 
 ## Packages (pnpm workspace, ESM, TypeScript)
@@ -77,14 +78,17 @@ per-repo toggle, default false; `provider`, `model`, `dailyCostCapUsd`), `runner
 1. Trigger (`webhook` auto / `/review` comment / dashboard button) → `triggerReviewForPr`
    → `enqueueReview` inserts a `queued` job (superseding any active job for that PR).
    Re-reviews set `round = max+1`, `preferredRunnerId` + `claudeSessionId` from the last job.
-2. Runner long-polls `/api/runners/lease` → `leaseNextJob` atomically claims a job
-   (`leased`, `leaseExpiresAt`). Affinity: jobs preferred for this runner first.
+2. Runner short-polls `/api/runners/lease` (returns immediately; sleeps `POLL_INTERVAL_MS`
+   and retries when empty) → `leaseNextJob` atomically claims a job (`leased`,
+   `leaseExpiresAt`). Affinity: jobs preferred for this runner first.
 3. Control plane assembles a `LeaseJob`: mints a 1h single-repo token, attaches prior
    findings (round > 1) and `resumeSessionId`.
 4. Runner checks out the PR diff, runs `claude -p`, POSTs `JobResult` (idempotent on
    `leaseId`). `persistResult` writes review+findings+usage and flips job to `succeeded`.
 5. Control plane posts the review to GitHub (it holds the App key) and stores the review id.
-6. Crash safety: `sweepExpiredLeases` (every 30s) requeues `leased` jobs past their TTL.
+6. Crash safety: `sweepExpiredLeases` requeues `leased` jobs past their TTL. Triggered by
+   the in-process 30s timer locally/on the VM (`ENABLE_INPROCESS_SWEEP`), or by Cloud
+   Scheduler → `POST /internal/sweep` on Cloud Run (where the timer can't fire at zero).
 
 ## Conventions
 
@@ -131,6 +135,13 @@ After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
   (`reviews.round`).
 - **pnpm build approval:** esbuild's build script must be approved (`allowBuilds: esbuild:
   true` in `pnpm-workspace.yaml`) or `pnpm install` hard-fails under the supply-chain policy.
+- **Scale-to-zero kills the in-process sweep timer:** on Cloud Run the frozen instance can't
+  fire `setInterval`, so prod lease recovery is Cloud Scheduler → `POST /internal/sweep`
+  (gated by `ENABLE_INPROCESS_SWEEP=false` + an `INTERNAL_API_TOKEN` bearer). Don't add other
+  background timers expecting them to run between requests on Cloud Run.
+- **Don't long-poll the lease endpoint:** the runner short-polls (returns immediately, sleeps
+  `POLL_INTERVAL_MS`, retries). A held connection bills Cloud Run for the whole duration and
+  would cost more than the VM's IP — the reason the long-poll was removed.
 
 ## Extending
 
@@ -152,10 +163,14 @@ matters: a runner with `ANTHROPIC_API_KEY` set must REFUSE to run.
 
 ## Deploy (topology)
 
-- **Control plane → GCP** Always-Free e2-micro: `docker compose -f
-  deploy/gcp/docker-compose.gcp.yml up -d --build`, Caddy for auto-HTTPS, **Neon** free
-  Postgres (external — set `DATABASE_URL`; SSL auto-enabled for remote hosts). Always-on
-  and public, so it never depends on the runner box being up. See `deploy/gcp/SETUP.md`.
-- **Runner → your machine** (where Claude is logged in): systemd user service, dials out
-  to the control plane's public URL. See `deploy/runner/SETUP.md`.
+- **Control plane → GCP Cloud Run** (scale-to-zero, ~$0): public HTTPS `*.run.app` URL with
+  managed TLS — **no external IP, no Caddy, no domain**. Shipped by
+  `.github/workflows/deploy.yml` on push to `main` (`gcloud run deploy --source .` → Cloud
+  Build builds the repo-root `Dockerfile`). **Neon** free Postgres (external — set
+  `DATABASE_URL`; SSL auto for remote hosts). Cloud Scheduler hits `POST /internal/sweep`
+  every minute to recover dead leases. Always-on/public, never depends on the runner box.
+  See `deploy/gcp/SETUP.md`. *(The e2-micro VM + Caddy path is kept as an appendix fallback;
+  it costs ~$3.65/mo for the IPv4.)*
+- **Runner → your machine** (where Claude is logged in): systemd user service, short-polls
+  the control plane's public `*.run.app` URL. See `deploy/runner/SETUP.md`.
 - The root `docker-compose.yml` (Postgres + control-plane) is for **local dev** only.

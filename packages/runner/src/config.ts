@@ -23,7 +23,12 @@ const EnvSchema = z.object({
   RUNNER_WORKDIR: z.string().default(resolve(homedir(), ".agentpr/work")),
   // Where the durable runner token is persisted after enrollment.
   RUNNER_CRED_FILE: z.string().default(resolve(homedir(), ".agentpr/runner.json")),
-  POLL_TIMEOUT_MS: z.coerce.number().default(60_000),
+  // How long to sleep between polls when the queue is empty (short-poll cadence).
+  // Worst-case enqueue→pickup latency ≈ this; ~25s mirrors the old long-poll feel.
+  POLL_INTERVAL_MS: z.coerce.number().default(25_000),
+  // Per-request abort. The lease request is now fast (one DB claim + optional
+  // token mint), so 20s is ample (was 60s when the server held the connection).
+  POLL_TIMEOUT_MS: z.coerce.number().default(20_000),
   CLAUDE_TIMEOUT_MS: z.coerce.number().default(20 * 60_000),
 });
 

@@ -1,0 +1,58 @@
+name: Deploy control plane to Cloud Run
+
+# Builds the control-plane image with Cloud Build (gcloud run deploy --source)
+# and ships it to Cloud Run (scale-to-zero). Redeploys PRESERVE the service's env
+# vars / secrets / service account — those are set ONCE by the operator during
+# initial setup (see deploy/gcp/SETUP.md), so this workflow only rebuilds + ships
+# the image and never clobbers configuration.
+#
+# Requires:
+#   - repo secret   GCP_SA_KEY   (service-account JSON key for gh-deployer)
+#   - repo variable PROJECT_ID   (your GCP project id)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "Dockerfile"
+      - ".gcloudignore"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "tsconfig.base.json"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  REGION: us-central1
+  SERVICE: control-plane
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # Cloud Build builds the repo-root Dockerfile (repo root is the build context).
+      # No --set-env-vars / --set-secrets here: Cloud Run keeps prior-revision config.
+      - name: Build and deploy
+        run: |
+          gcloud run deploy "$SERVICE" --source . \
+            --project "$PROJECT_ID" --region "$REGION" --quiet

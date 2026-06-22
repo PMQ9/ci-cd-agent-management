@@ -22,7 +22,7 @@ services:
     profiles: ["prod"]
     build:
       context: .
-      dockerfile: packages/control-plane/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:

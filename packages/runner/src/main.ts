@@ -112,11 +112,16 @@ async function main(): Promise<void> {
   while (running) {
     try {
       const { job } = await client.lease();
-      backoff = 1000;
-      if (job) await handleJob(client, job);
+      backoff = 1000; // reset on any successful poll
+      if (job) {
+        await handleJob(client, job);
+        continue; // job handled — re-poll immediately to drain the queue
+      }
+      // No work: short-poll idle wait before re-polling so we don't hot-loop.
+      await new Promise((r) => setTimeout(r, env.POLL_INTERVAL_MS));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (/abort/i.test(message)) continue; // long-poll window elapsed; just re-poll
+      if (/abort/i.test(message)) continue; // request abort timeout; just re-poll
       log(`poll error: ${message}; retrying in ${backoff}ms`);
       await new Promise((r) => setTimeout(r, backoff));
       backoff = Math.min(backoff * 2, 30_000);

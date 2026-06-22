@@ -41,6 +41,14 @@ const EnvSchema = z.object({
   RUNNER_OFFLINE_SECONDS: z.coerce.number().default(60),
   GLOBAL_DAILY_COST_CAP_USD: z.coerce.number().optional(),
 
+  // Shared bearer secret for /internal/* (e.g. Cloud Scheduler → POST /internal/sweep).
+  // Required because the service is public (--allow-unauthenticated) for webhooks.
+  INTERNAL_API_TOKEN: z.string().optional(),
+  // In-process lease sweep timer. Keep "true" for local dev / the VM; set "false"
+  // on Cloud Run scale-to-zero (the timer can't fire when the instance is frozen)
+  // and rely on Cloud Scheduler → POST /internal/sweep instead.
+  ENABLE_INPROCESS_SWEEP: z.string().default("true"),
+
   // Optional: absolute path to a prebuilt dashboard (served statically). If
   // unset, the control plane runs API-only and you use `pnpm dev:dash`.
   DASHBOARD_DIST: z.string().optional(),
