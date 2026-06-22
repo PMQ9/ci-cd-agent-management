@@ -8,6 +8,7 @@ import {
   syncInstallationRepos,
   upsertInstallation,
 } from "./github/sync.js";
+import { markPullRequestClosed, upsertPullRequest } from "./github/pr-sync.js";
 import { triggerReviewForPr } from "./review-service.js";
 import { safeEqualHex } from "./util/crypto.js";
 
@@ -85,17 +86,50 @@ async function handleInstallationRepos(payload: Payload, request: FastifyRequest
   }
 }
 
-const PR_ACTIONS = new Set(["opened", "reopened", "ready_for_review", "synchronize"]);
+// Actions worth (re)enqueueing an auto-review for.
+const REVIEW_ACTIONS = new Set(["opened", "reopened", "ready_for_review", "synchronize"]);
+// Actions that should refresh the open-PR inbox — superset of REVIEW_ACTIONS.
+// Detection runs regardless of the auto-review toggle; it costs no review quota.
+const REGISTRY_ACTIONS = new Set([
+  "opened",
+  "reopened",
+  "ready_for_review",
+  "converted_to_draft",
+  "synchronize",
+  "edited",
+]);
 
 async function handlePullRequest(payload: Payload, request: FastifyRequest) {
   const action = payload.action as string;
-  if (!PR_ACTIONS.has(action)) return { ok: true, ignored: action };
-
   const repo = await findRepoByGithubId(payload.repository?.id);
   if (!repo) return { ok: true, ignored: "repo_not_connected" };
-  if (!repo.autoReviewEnabled) return { ok: true, ignored: "auto_review_off" };
 
   const pr = payload.pull_request;
+
+  // 1) Keep the open-PR inbox fresh on every relevant event. This is the
+  //    "auto-detect" path — pure metadata, independent of the review toggle.
+  //    `edited` (and friends) can fire on an already closed/merged PR, so trust
+  //    the payload's state rather than force-opening the row back into the inbox.
+  if (action === "closed" || (REGISTRY_ACTIONS.has(action) && pr.state !== "open")) {
+    await markPullRequestClosed(repo.id, pr.number, Boolean(pr.merged));
+  } else if (REGISTRY_ACTIONS.has(action)) {
+    await upsertPullRequest({
+      repoId: repo.id,
+      number: pr.number,
+      title: pr.title ?? "",
+      author: pr.user?.login ?? null,
+      headSha: pr.head?.sha ?? "",
+      baseSha: pr.base?.sha ?? "",
+      isDraft: Boolean(pr.draft),
+      htmlUrl: pr.html_url ?? "",
+      prUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
+    });
+  }
+
+  // 2) Auto-review enqueue — still gated on review-worthy actions + the toggle.
+  if (!REVIEW_ACTIONS.has(action)) return { ok: true, ignored: action };
+  if (!repo.autoReviewEnabled) return { ok: true, ignored: "auto_review_off" };
+
   const outcome = await triggerReviewForPr({
     repo,
     prNumber: pr.number,

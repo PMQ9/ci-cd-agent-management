@@ -4,12 +4,20 @@ import {
   api,
   type InstallationsResponse,
   type JobDTO,
+  type PullRequestDTO,
   type RepoDTO,
   type RunnerDTO,
   type UsageSummary,
 } from "./api.js";
 
-type Tab = "repos" | "runners" | "activity" | "usage";
+type Tab = "repos" | "pulls" | "runners" | "activity" | "usage";
+const TAB_LABELS: Record<Tab, string> = {
+  repos: "Repos",
+  pulls: "Pull Requests",
+  runners: "Runners",
+  activity: "Activity",
+  usage: "Usage",
+};
 
 export function App() {
   const [login, setLogin] = useState<string | null>(null);
@@ -34,9 +42,9 @@ export function App() {
           <span className="logo">◆</span> Agent PR <span className="muted">Control Center</span>
         </div>
         <nav className="tabs">
-          {(["repos", "runners", "activity", "usage"] as Tab[]).map((t) => (
+          {(["repos", "pulls", "runners", "activity", "usage"] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>
-              {t}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </nav>
@@ -49,6 +57,7 @@ export function App() {
       </header>
       <main className="content">
         {tab === "repos" && <ReposPanel />}
+        {tab === "pulls" && <PullsPanel />}
         {tab === "runners" && <RunnersPanel />}
         {tab === "activity" && <ActivityPanel />}
         {tab === "usage" && <UsagePanel />}
@@ -218,6 +227,121 @@ function RepoRow({ repo, onChange }: { repo: RepoDTO; onChange: () => void }) {
       </div>
       {msg && <div className="repo-msg muted">{msg}</div>}
     </div>
+  );
+}
+
+function PullsPanel() {
+  const { data, reload } = useAsync<PullRequestDTO[]>(() => api.pulls(), []);
+  const [syncing, setSyncing] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const sync = async () => {
+    setSyncing(true);
+    setMsg(null);
+    try {
+      const r = await api.syncPulls();
+      setMsg(
+        `Synced ${r.open} open PR(s) across ${r.repos} repo(s)` +
+          (r.cappedRepos
+            ? ` (${r.cappedRepos} repo(s) hit the 1000-PR listing cap — some open PRs may not be shown)`
+            : "") +
+          ".",
+      );
+      reload();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const review = async (pr: PullRequestDTO) => {
+    setBusyId(pr.id);
+    setMsg(null);
+    try {
+      const res = await api.reviewPr(pr.repoId, pr.number);
+      setMsg(
+        res.status === "queued"
+          ? `Queued review of ${pr.repoFullName} #${pr.number}.`
+          : `Skipped: ${res.reason}`,
+      );
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <section>
+      <div className="row between">
+        <h2>Pull Requests</h2>
+        <div className="row gap">
+          <button className="btn small ghost" onClick={sync} disabled={syncing}>
+            {syncing ? "Syncing…" : "Sync from GitHub"}
+          </button>
+          <button className="btn ghost" onClick={reload}>
+            ⟳ Refresh
+          </button>
+        </div>
+      </div>
+      <p className="muted">
+        Open PRs across your connected repos. New PRs are detected automatically from GitHub events;
+        use “Sync from GitHub” to backfill PRs opened before detection was enabled. Reviewing a PR
+        consumes quota — auto-detection does not.
+      </p>
+      {msg && <div className="repo-msg muted">{msg}</div>}
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Repo</th>
+            <th>PR</th>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Updated</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {data?.map((p) => (
+            <tr key={p.id}>
+              <td className="mono">{p.repoFullName}</td>
+              <td>
+                <a href={p.htmlUrl} target="_blank" rel="noreferrer">
+                  #{p.number}
+                </a>
+              </td>
+              <td>
+                {p.title || <span className="muted">(no title)</span>}
+                {p.isDraft && <span className="badge subtle">draft</span>}
+                {!p.autoReviewEnabled && <span className="badge subtle">manual</span>}
+              </td>
+              <td className="muted">{p.author ?? "—"}</td>
+              <td className="muted">
+                {p.prUpdatedAt ? new Date(p.prUpdatedAt).toLocaleString() : "—"}
+              </td>
+              <td>
+                <button
+                  className="btn small primary"
+                  disabled={busyId === p.id}
+                  onClick={() => review(p)}
+                >
+                  {busyId === p.id ? "…" : "Review"}
+                </button>
+              </td>
+            </tr>
+          ))}
+          {!data?.length && (
+            <tr>
+              <td colSpan={6} className="muted">
+                No open PRs detected yet. Click “Sync from GitHub” to backfill existing ones.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

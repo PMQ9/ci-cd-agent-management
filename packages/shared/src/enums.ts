@@ -40,3 +40,6 @@ export type Severity = (typeof SEVERITIES)[number];
 
 export const RUNNER_STATUSES = ["online", "offline"] as const;
 export type RunnerStatus = (typeof RUNNER_STATUSES)[number];
+
+export const PR_STATES = ["open", "closed", "merged"] as const;
+export type PrState = (typeof PR_STATES)[number];

@@ -35,6 +35,19 @@ export interface JobDTO {
   updatedAt: string;
 }
 
+export interface PullRequestDTO {
+  id: string;
+  repoId: string;
+  repoFullName: string;
+  number: number;
+  title: string;
+  author: string | null;
+  isDraft: boolean;
+  htmlUrl: string;
+  autoReviewEnabled: boolean;
+  prUpdatedAt: string | null;
+}
+
 export interface UsageSummary {
   today: number;
   last7d: number;
@@ -92,4 +105,11 @@ export const api = {
 
   jobs: () => req<JobDTO[]>("/api/jobs"),
   usage: () => req<UsageSummary>("/api/usage/summary"),
+
+  pulls: () => req<PullRequestDTO[]>("/api/pulls"),
+  syncPulls: () =>
+    req<{ ok: boolean; open: number; repos: number; cappedRepos: number }>("/api/pulls/sync", {
+      method: "POST",
+      body: "{}",
+    }),
 };

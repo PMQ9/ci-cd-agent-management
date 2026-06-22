@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   FINDING_STATUSES,
   JOB_STATES,
+  PR_STATES,
   PROVIDERS,
   RUNNER_STATUSES,
   SEVERITIES,
@@ -25,6 +26,26 @@ export const RepoSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type Repo = z.infer<typeof RepoSchema>;
+
+// An open (or recently-closed) PR detected from GitHub events. This is metadata
+// only — populating it never runs the agent, so it costs no review quota. It's
+// what powers the dashboard's "Pull Requests" inbox.
+export const PullRequestSchema = z.object({
+  id: z.string().uuid(),
+  repoId: z.string().uuid(),
+  number: z.number().int(),
+  title: z.string(),
+  author: z.string().nullable(),
+  headSha: z.string(),
+  baseSha: z.string(),
+  isDraft: z.boolean(),
+  state: z.enum(PR_STATES),
+  htmlUrl: z.string(),
+  prUpdatedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type PullRequest = z.infer<typeof PullRequestSchema>;
 
 export const RunnerSchema = z.object({
   id: z.string().uuid(),

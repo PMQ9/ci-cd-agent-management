@@ -119,6 +119,61 @@ export async function postReview(opts: {
   }
 }
 
+// A lightweight, app-agnostic view of an open PR (for the inbox registry).
+export type GhPull = {
+  number: number;
+  title: string;
+  author: string | null;
+  headSha: string;
+  baseSha: string;
+  draft: boolean;
+  htmlUrl: string;
+  updatedAt: string | null;
+};
+
+/**
+ * List a repo's open PRs via the installation token. Metadata only — this never
+ * runs the agent, so it costs no review quota. Paged manually (the App's Octokit
+ * core has no `.paginate`); capped to avoid unbounded calls.
+ */
+export async function listOpenPrs(
+  installationId: number,
+  owner: string,
+  repo: string,
+): Promise<{ pulls: GhPull[]; capped: boolean }> {
+  const octokit = await getApp().getInstallationOctokit(installationId);
+  const perPage = 100;
+  const maxPages = 10;
+  const pulls: GhPull[] = [];
+  let capped = false;
+  for (let page = 1; page <= maxPages; page++) {
+    const { data } = await octokit.request("GET /repos/{owner}/{repo}/pulls", {
+      owner,
+      repo,
+      state: "open",
+      per_page: perPage,
+      page,
+      sort: "updated",
+      direction: "desc",
+    });
+    for (const p of data) {
+      pulls.push({
+        number: p.number,
+        title: p.title ?? "",
+        author: p.user?.login ?? null,
+        headSha: p.head?.sha ?? "",
+        baseSha: p.base?.sha ?? "",
+        draft: Boolean(p.draft),
+        htmlUrl: p.html_url ?? "",
+        updatedAt: p.updated_at ?? null,
+      });
+    }
+    if (data.length < perPage) break;
+    if (page === maxPages) capped = true;
+  }
+  return { pulls, capped };
+}
+
 /** Resolve the base/head SHAs and clone URL for a PR (used when enqueuing). */
 export async function getPrRefs(
   installationId: number,

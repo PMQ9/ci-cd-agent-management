@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -16,6 +17,7 @@ import { sql } from "drizzle-orm";
 import {
   FINDING_STATUSES,
   JOB_STATES,
+  PR_STATES,
   PROVIDERS,
   SEVERITIES,
   TRIGGER_SOURCES,
@@ -29,6 +31,7 @@ export const providerEnum = pgEnum("provider", PROVIDERS);
 export const verdictEnum = pgEnum("verdict", VERDICTS);
 export const findingStatusEnum = pgEnum("finding_status", FINDING_STATUSES);
 export const severityEnum = pgEnum("severity", SEVERITIES);
+export const prStateEnum = pgEnum("pr_state", PR_STATES);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -60,6 +63,34 @@ export const repos = pgTable("repos", {
   dailyCostCapUsd: numeric("daily_cost_cap_usd", { precision: 10, scale: 4 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Open-PR inbox. Kept fresh by the webhook on every pull_request event
+// (independent of the auto-review toggle) and by on-demand GitHub backfill.
+// Metadata only — never triggers the agent, so it consumes no review quota.
+export const pullRequests = pgTable(
+  "pull_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    repoId: uuid("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    title: text("title").notNull().default(""),
+    author: text("author"),
+    headSha: text("head_sha").notNull().default(""),
+    baseSha: text("base_sha").notNull().default(""),
+    isDraft: boolean("is_draft").notNull().default(false),
+    state: prStateEnum("state").notNull().default("open"),
+    htmlUrl: text("html_url").notNull().default(""),
+    prUpdatedAt: timestamp("pr_updated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("pull_requests_repo_number_idx").on(t.repoId, t.number),
+    index("pull_requests_repo_state_idx").on(t.repoId, t.state),
+  ],
+);
 
 export const runners = pgTable("runners", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -156,3 +187,4 @@ export const usageEvents = pgTable(
 export type JobRow = typeof jobs.$inferSelect;
 export type RepoRow = typeof repos.$inferSelect;
 export type RunnerRow = typeof runners.$inferSelect;
+export type PullRequestRow = typeof pullRequests.$inferSelect;

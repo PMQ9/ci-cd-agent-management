@@ -4,6 +4,7 @@ import { env, isProd } from "./config.js";
 import { registerAuth } from "./auth.js";
 import { sweepExpiredLeases } from "./queue.js";
 import { registerJobRoutes } from "./routes/jobs.js";
+import { registerPullRoutes } from "./routes/pulls.js";
 import { registerRepoRoutes } from "./routes/repos.js";
 import { registerRunnerRoutes } from "./routes/runners.js";
 import { registerUsageRoutes } from "./routes/usage.js";
@@ -57,6 +58,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   registerWebhook(app);
   registerRunnerRoutes(app);
   registerRepoRoutes(app);
+  registerPullRoutes(app);
   registerJobRoutes(app);
   registerUsageRoutes(app);
 
