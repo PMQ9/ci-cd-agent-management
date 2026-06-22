@@ -14,10 +14,10 @@ the agent on **your own machine**, where it's logged in via OAuth.
 ## How it works
 
 ```
-GitHub  ──webhook──▶  Control plane (GCP free VM, public HTTPS) ── Neon (Postgres)
+GitHub  ──webhook──▶  Control plane (GCP Cloud Run, scale-to-zero) ── Neon (Postgres)
                         • GitHub App + dashboard + job queue
                         • posts the review back to the PR
-                              ▲ long-poll (outbound 443)   │ result
+                              ▲ short-poll (outbound 443)  │ result
                               │                             ▼
                         Runner (your machine) ── runs `claude -p` on the PR diff
                         holds your Claude login; API key never used
@@ -48,9 +48,9 @@ App — see the deploy guides below.
 
 ## Deploy
 
-- **Control plane → GCP** (Always-Free e2-micro + Caddy auto-HTTPS + Neon free Postgres):
-  **[deploy/gcp/SETUP.md](deploy/gcp/SETUP.md)**. Always-on and public, so webhooks land
-  even when your laptop is off.
+- **Control plane → GCP Cloud Run** (scale-to-zero ~$0, managed HTTPS, no IP/domain) **+
+  Neon free Postgres**: **[deploy/gcp/SETUP.md](deploy/gcp/SETUP.md)**. Always-on and
+  public, so webhooks land even when your laptop is off.
 - **Runner → your machine** (where Claude is logged in; dials out to the control plane):
   **[deploy/runner/SETUP.md](deploy/runner/SETUP.md)**.
 
@@ -66,6 +66,11 @@ App — see the deploy guides below.
 For architecture details and conventions, see [CLAUDE.md](CLAUDE.md).
 
 ## Status
+
+**Live:** control plane deployed to GCP Cloud Run at
+`https://control-plane-792029157879.us-central1.run.app` (project `agentpr-cp-ff3097`),
+auto-deploys on push to `main`. Last step to go end-to-end: connect a runner on the
+machine where Claude is logged in (**[deploy/runner/SETUP.md](deploy/runner/SETUP.md)**).
 
 v1 = Claude Code, single user, multi-runner-ready. Deferred: OpenCode adapter (it can't
 use a Claude subscription per Anthropic's ToS — it'd be a free non-Claude model),

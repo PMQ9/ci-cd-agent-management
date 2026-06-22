@@ -174,3 +174,19 @@ matters: a runner with `ANTHROPIC_API_KEY` set must REFUSE to run.
 - **Runner → your machine** (where Claude is logged in): systemd user service, short-polls
   the control plane's public `*.run.app` URL. See `deploy/runner/SETUP.md`.
 - The root `docker-compose.yml` (Postgres + control-plane) is for **local dev** only.
+
+## Deployment status (LIVE — first deployed 2026-06-22)
+
+The control plane is deployed and serving. **Don't re-run the one-time SETUP.md steps** — they're done; `git push main` redeploys (env/secrets persist).
+
+- **GCP project:** `agentpr-cp-ff3097` (project number `792029157879`) — a **dedicated** project. ⚠️ NOT `vu-ccc-ca-pmq9` (that's the unrelated CCC stack — do not touch it).
+- **Region:** `us-central1`. **Service:** `control-plane`. **URL:** `https://control-plane-792029157879.us-central1.run.app` (stable across redeploys; it's also `PUBLIC_URL`).
+- **Cloud Run shape:** `--min-instances 0 --max-instances 2 --cpu 1 --memory 512Mi --timeout 300 --allow-unauthenticated`, default CPU throttling (scale-to-zero, ~$0).
+- **Runtime SA:** `cp-runtime@agentpr-cp-ff3097.iam.gserviceaccount.com` (least-privilege; `secretAccessor` granted per-secret — NOT the broad compute default SA). Preserved across redeploys.
+- **Secrets (Secret Manager, names only):** `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_CLIENT_SECRET`, `SESSION_SECRET`, `RUNNER_ENROLLMENT_SECRET`, `DATABASE_URL`, `INTERNAL_API_TOKEN`. (Out-of-band backups still recommended — see SETUP §"Cost / free-tier notes".)
+- **Env vars set on the service:** `NODE_ENV=production`, `AUTO_MIGRATE=true`, `ENABLE_INPROCESS_SWEEP=false`, `PUBLIC_URL=<run url>`, `GITHUB_APP_ID=4119526`, `GITHUB_APP_SLUG=ci-cd-agent-managment`, `GITHUB_APP_CLIENT_ID=Iv23liM3o6H7u2H6aJbR`, `ALLOWED_GITHUB_LOGIN=PMQ9`.
+- **DB:** Neon, **pooled** endpoint (`...-pooler...`), `DATABASE_SSL=auto` (verified SSL for the remote host). Migrations already applied.
+- **Sweep:** Cloud Scheduler job `sweep-leases` (us-central1), `* * * * *`, `POST /internal/sweep` with `Authorization: Bearer <INTERNAL_API_TOKEN>` (literal token, NOT Google OIDC — the route compares the raw token). Verified 200 with bearer / 401 without.
+- **GitHub App:** id `4119526`, slug `ci-cd-agent-managment`, installed on account `PMQ9` (all repos). Callback `…/auth/callback` + webhook `…/webhook`.
+- **CI:** `.github/workflows/deploy.yml` on push to `main`. Repo var `PROJECT_ID` + secret `GCP_SA_KEY` (`gh-deployer@…` key) are set on `PMQ9/ci-cd-agent-management`.
+- **Pending (operator/runner-side):** connect a runner on the machine where Claude is logged in (`deploy/runner/SETUP.md`, `CONTROL_PLANE_URL=<run url>`, enrollment secret = the `RUNNER_ENROLLMENT_SECRET` value). Until a runner is online, jobs queue but nothing executes.
