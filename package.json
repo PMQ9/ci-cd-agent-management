@@ -1,0 +1,29 @@
+{
+  "name": "ci-cd-agent-management",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted control plane that routes GitHub PR reviews to terminal AI agents (Claude Code) running on your own machines via OAuth.",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.6.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:cp": "pnpm --filter @agentpr/control-plane dev",
+    "dev:runner": "pnpm --filter @agentpr/runner dev",
+    "dev:dash": "pnpm --filter @agentpr/dashboard dev",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose stop postgres",
+    "db:generate": "pnpm --filter @agentpr/control-plane db:generate",
+    "db:migrate": "pnpm --filter @agentpr/control-plane db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "tsup": "^8.3.5"
+  }
+}

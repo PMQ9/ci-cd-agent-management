@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+
+# runner working dirs
+.agentpr/
+work/
+
+# logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

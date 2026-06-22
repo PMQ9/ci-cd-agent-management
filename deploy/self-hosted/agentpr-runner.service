@@ -1,0 +1,27 @@
+# systemd USER service. Install to ~/.config/systemd/user/agentpr-runner.service
+#
+#   loginctl enable-linger $USER          # run without an active login session
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now agentpr-runner
+#   journalctl --user -u agentpr-runner -f
+#
+# Adjust the two ABSOLUTE paths below (node and the repo) for your machine.
+[Unit]
+Description=Agent PR runner (Claude Code)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.agentpr/runner.env
+WorkingDirectory=%h/.agentpr
+# Use an absolute node path (node is not on the non-interactive PATH). Find it with:
+#   zsh -lic 'command -v node'
+ExecStart=/home/youruser/.local/share/fnm/aliases/default/bin/node %h/agentpr/packages/runner/dist/main.js
+Restart=always
+RestartSec=5
+# Belt and suspenders: ensure the API key is never inherited into the agent.
+UnsetEnvironment=ANTHROPIC_API_KEY
+
+[Install]
+WantedBy=default.target

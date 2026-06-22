@@ -1,0 +1,134 @@
+import { createHmac } from "node:crypto";
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import { env, githubConfigured } from "./config.js";
+import {
+  findRepoByGithubId,
+  removeInstallation,
+  removeRepoByGithubId,
+  syncInstallationRepos,
+  upsertInstallation,
+} from "./github/sync.js";
+import { triggerReviewForPr } from "./review-service.js";
+import { safeEqualHex } from "./util/crypto.js";
+
+// Loose view of the GitHub payloads we touch (validated structurally as we read).
+type Payload = Record<string, any>;
+
+function verifySignature(request: FastifyRequest): boolean {
+  const sig = request.headers["x-hub-signature-256"];
+  const raw = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
+  if (typeof sig !== "string" || !raw) return false;
+  const expected = "sha256=" + createHmac("sha256", env.GITHUB_WEBHOOK_SECRET!).update(raw).digest("hex");
+  return safeEqualHex(sig, expected);
+}
+
+export function registerWebhook(app: FastifyInstance): void {
+  app.post("/webhook", async (request, reply) => {
+    if (!githubConfigured) return reply.code(503).send({ ok: false, reason: "github_not_configured" });
+    if (!verifySignature(request)) return reply.code(401).send({ ok: false, reason: "bad_signature" });
+
+    const event = request.headers["x-github-event"];
+    const payload = request.body as Payload;
+
+    try {
+      switch (event) {
+        case "installation":
+          await handleInstallation(payload, request);
+          break;
+        case "installation_repositories":
+          await handleInstallationRepos(payload, request);
+          break;
+        case "pull_request":
+          return reply.send(await handlePullRequest(payload, request));
+        case "issue_comment":
+          return reply.send(await handleIssueComment(payload, request));
+        default:
+          break;
+      }
+    } catch (err) {
+      request.log.error({ err, event }, "webhook handler failed");
+      return reply.code(500).send({ ok: false });
+    }
+    return reply.send({ ok: true });
+  });
+}
+
+async function handleInstallation(payload: Payload, request: FastifyRequest): Promise<void> {
+  const id = payload.installation?.id as number;
+  const action = payload.action as string;
+  if (!id) return;
+  if (action === "deleted") {
+    await removeInstallation(id);
+    return;
+  }
+  await upsertInstallation({
+    id,
+    accountLogin: payload.installation?.account?.login ?? "unknown",
+    repoSelection: payload.installation?.repository_selection,
+    suspendedAt: action === "suspend" ? new Date() : null,
+  });
+  if (action === "created" || action === "unsuspend") {
+    const n = await syncInstallationRepos(id);
+    request.log.info({ installationId: id, repos: n }, "installation synced");
+  }
+}
+
+async function handleInstallationRepos(payload: Payload, request: FastifyRequest): Promise<void> {
+  const id = payload.installation?.id as number;
+  if (!id) return;
+  for (const r of (payload.repositories_removed ?? []) as Payload[]) {
+    await removeRepoByGithubId(r.id);
+  }
+  if ((payload.repositories_added ?? []).length) {
+    const n = await syncInstallationRepos(id);
+    request.log.info({ installationId: id, repos: n }, "installation repos synced");
+  }
+}
+
+const PR_ACTIONS = new Set(["opened", "reopened", "ready_for_review", "synchronize"]);
+
+async function handlePullRequest(payload: Payload, request: FastifyRequest) {
+  const action = payload.action as string;
+  if (!PR_ACTIONS.has(action)) return { ok: true, ignored: action };
+
+  const repo = await findRepoByGithubId(payload.repository?.id);
+  if (!repo) return { ok: true, ignored: "repo_not_connected" };
+  if (!repo.autoReviewEnabled) return { ok: true, ignored: "auto_review_off" };
+
+  const pr = payload.pull_request;
+  const outcome = await triggerReviewForPr({
+    repo,
+    prNumber: pr.number,
+    trigger: "auto",
+    headSha: pr.head?.sha,
+    baseSha: pr.base?.sha,
+    draftHint: Boolean(pr.draft),
+  });
+  request.log.info({ repo: repo.fullName, pr: pr.number, action, outcome }, "pull_request handled");
+  return { ok: true, ...outcome };
+}
+
+async function handleIssueComment(payload: Payload, request: FastifyRequest) {
+  if (payload.action !== "created") return { ok: true, ignored: "not_created" };
+  if (!payload.issue?.pull_request) return { ok: true, ignored: "not_a_pr" };
+
+  const body: string = (payload.comment?.body ?? "").trim();
+  if (!/^\/review\b/i.test(body)) return { ok: true, ignored: "no_command" };
+
+  // Only the allowlisted user may spend your quota via a comment.
+  const commenter = payload.comment?.user?.login;
+  if (env.ALLOWED_GITHUB_LOGIN && commenter !== env.ALLOWED_GITHUB_LOGIN) {
+    return { ok: true, ignored: "commenter_not_allowed" };
+  }
+
+  const repo = await findRepoByGithubId(payload.repository?.id);
+  if (!repo) return { ok: true, ignored: "repo_not_connected" };
+
+  const outcome = await triggerReviewForPr({
+    repo,
+    prNumber: payload.issue.number,
+    trigger: "command",
+  });
+  request.log.info({ repo: repo.fullName, pr: payload.issue.number, outcome }, "/review handled");
+  return { ok: true, ...outcome };
+}

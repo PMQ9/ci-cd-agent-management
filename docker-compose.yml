@@ -1,0 +1,38 @@
+# Runs on your self-hosted host. For local dev you typically only need `postgres`
+# (`pnpm db:up`) and run the control-plane with `pnpm dev:cp`.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentpr
+      POSTGRES_PASSWORD: agentpr
+      POSTGRES_DB: agentpr
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentpr -d agentpr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  control-plane:
+    profiles: ["prod"]
+    build:
+      context: .
+      dockerfile: packages/control-plane/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # inside the compose network, reach postgres by service name
+      DATABASE_URL: postgres://agentpr:agentpr@postgres:5432/agentpr
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
