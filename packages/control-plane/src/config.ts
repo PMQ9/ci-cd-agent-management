@@ -19,6 +19,9 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().default(8080),
   PUBLIC_URL: z.string().url().default("http://localhost:8080"),
   DATABASE_URL: z.string().min(1),
+  // 'auto' enables SSL for non-local DBs (e.g. Neon). Override if your provider
+  // needs it off ('disable') or uses a self-signed cert ('no-verify').
+  DATABASE_SSL: z.enum(["auto", "require", "no-verify", "disable"]).default("auto"),
 
   GITHUB_APP_ID: z.string().optional(),
   GITHUB_APP_SLUG: z.string().optional(), // for the install/manage link on the dashboard

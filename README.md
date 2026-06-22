@@ -14,11 +14,11 @@ the agent on **your own machine**, where it's logged in via OAuth.
 ## How it works
 
 ```
-GitHub  ──webhook──▶  Control plane (your self-hosted host, public via Tailscale Funnel)
-                        • GitHub App + dashboard + Postgres job queue
+GitHub  ──webhook──▶  Control plane (GCP free VM, public HTTPS) ── Neon (Postgres)
+                        • GitHub App + dashboard + job queue
                         • posts the review back to the PR
-                              ▲ long-poll (outbound)   │ result
-                              │                         ▼
+                              ▲ long-poll (outbound 443)   │ result
+                              │                             ▼
                         Runner (your machine) ── runs `claude -p` on the PR diff
                         holds your Claude login; API key never used
 ```
@@ -44,13 +44,15 @@ pnpm dev:runner            # runner       → enrolls + polls for jobs
 ```
 
 In the dashboard, click **Dev login** (local only). Connecting real repos needs a GitHub
-App — see **[deploy/self-hosted/SETUP.md](deploy/self-hosted/SETUP.md)**.
+App — see the deploy guides below.
 
 ## Deploy
 
-Runs on any always-on box you control: control plane + Postgres + dashboard in Docker
-Compose, the runner as a systemd service, public URL via Tailscale Funnel. Full guide:
-**[deploy/self-hosted/SETUP.md](deploy/self-hosted/SETUP.md)**.
+- **Control plane → GCP** (Always-Free e2-micro + Caddy auto-HTTPS + Neon free Postgres):
+  **[deploy/gcp/SETUP.md](deploy/gcp/SETUP.md)**. Always-on and public, so webhooks land
+  even when your laptop is off.
+- **Runner → your machine** (where Claude is logged in; dials out to the control plane):
+  **[deploy/runner/SETUP.md](deploy/runner/SETUP.md)**.
 
 ## Layout
 

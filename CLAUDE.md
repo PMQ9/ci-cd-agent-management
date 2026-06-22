@@ -123,8 +123,8 @@ After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
 - **Session resume is best-effort:** `--resume` across headless runs is unverified, so
   re-reviews **re-feed prior findings** as the primary mechanism; resume + runner affinity
   is an optimization with fallback. Don't make features depend on resume.
-- **`claude` is not on the non-interactive PATH** on your self-hosted host → the runner uses an
-  absolute `CLAUDE_BIN`.
+- **`claude` is not always on the non-interactive PATH** on the runner host → the runner
+  uses an absolute `CLAUDE_BIN`.
 - **OpenCode ≠ Claude subscription** (Anthropic ToS). The `opencode` provider is a stub
   (`provider !== "claude_code"` throws). Implementing it = a free non-Claude backend only.
 - **Submitted GitHub reviews can't be edited** → every re-review is a NEW review object
@@ -146,13 +146,16 @@ After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
 ## Verification
 
 Local: `pnpm -r typecheck && pnpm -r build`, `pnpm db:up`, boot the control plane, then
-the smoke checks in this repo's history (enroll runner, dev-login, list endpoints).
-End-to-end (needs the GitHub App + a real PR, consumes quota): see
-`deploy/self-hosted/SETUP.md` §5. The negative check that matters: a runner with
-`ANTHROPIC_API_KEY` set must REFUSE to run.
+the smoke checks (enroll runner, dev-login, list endpoints). End-to-end (needs the GitHub
+App + a real PR, consumes quota): see `deploy/gcp/SETUP.md` §7. The negative check that
+matters: a runner with `ANTHROPIC_API_KEY` set must REFUSE to run.
 
-## Deploy
+## Deploy (topology)
 
-your self-hosted host: control plane + Postgres + dashboard via `docker compose --profile prod up`,
-runner as a systemd user service, public URL via Tailscale Funnel. See
-`deploy/self-hosted/SETUP.md` and `docs/runbooks/`.
+- **Control plane → GCP** Always-Free e2-micro: `docker compose -f
+  deploy/gcp/docker-compose.gcp.yml up -d --build`, Caddy for auto-HTTPS, **Neon** free
+  Postgres (external — set `DATABASE_URL`; SSL auto-enabled for remote hosts). Always-on
+  and public, so it never depends on the runner box being up. See `deploy/gcp/SETUP.md`.
+- **Runner → your machine** (where Claude is logged in): systemd user service, dials out
+  to the control plane's public URL. See `deploy/runner/SETUP.md`.
+- The root `docker-compose.yml` (Postgres + control-plane) is for **local dev** only.

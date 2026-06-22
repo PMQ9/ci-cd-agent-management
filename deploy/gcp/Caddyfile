@@ -1,0 +1,10 @@
+# Replace with YOUR public hostname (e.g. a free DuckDNS subdomain whose A record
+# points at the VM's external IP). Caddy fetches + renews a Let's Encrypt cert
+# automatically. The email is for cert expiry notices.
+{
+	email you@example.com
+}
+
+your-host.duckdns.org {
+	reverse_proxy control-plane:8080
+}

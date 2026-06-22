@@ -1,0 +1,32 @@
+# Control plane on a GCP e2-micro (Always Free). Postgres is external (Neon free
+# tier) — the 1 GB VM can't run Node + Caddy + Postgres together. Caddy fronts the
+# control plane with automatic HTTPS.
+#
+# Run from the repo root:
+#   docker compose -f deploy/gcp/docker-compose.gcp.yml up -d --build
+services:
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: packages/control-plane/Dockerfile
+    restart: unless-stopped
+    env_file: ../../.env
+    expose:
+      - "8080" # internal only; Caddy terminates TLS and proxies in
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - control-plane
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
