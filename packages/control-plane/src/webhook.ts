@@ -24,8 +24,14 @@ function verifySignature(request: FastifyRequest): boolean {
   return safeEqualHex(sig, expected);
 }
 
+// Per-route rate limit for the public webhook endpoint. Generous enough that
+// legitimate GitHub deliveries (spread across GitHub's source IPs) never trip it,
+// while a single IP flooding bad-signature requests is capped. Keyed by client IP
+// (trustProxy is on, so that's the real X-Forwarded-For address behind Cloud Run).
+export const WEBHOOK_RATE_LIMIT = { max: 300, timeWindow: "1 minute" } as const;
+
 export function registerWebhook(app: FastifyInstance): void {
-  app.post("/webhook", async (request, reply) => {
+  app.post("/webhook", { config: { rateLimit: WEBHOOK_RATE_LIMIT } }, async (request, reply) => {
     if (!githubConfigured)
       return reply.code(503).send({ ok: false, reason: "github_not_configured" });
     if (!verifySignature(request))

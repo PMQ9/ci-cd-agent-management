@@ -13,6 +13,7 @@
   "dependencies": {
     "@agentpr/shared": "workspace:*",
     "@fastify/cookie": "^11.0.2",
+    "@fastify/rate-limit": "^11.0.0",
     "@fastify/static": "^8.0.3",
     "@octokit/app": "^15.1.1",
     "@octokit/core": "^6.1.2",

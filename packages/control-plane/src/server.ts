@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuth } from "./auth.js";
 import { env, isProd } from "./config.js";
@@ -34,6 +35,12 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   await app.register(cookie, { secret: env.SESSION_SECRET });
+
+  // Rate limiting is opt-in per route (global: false) so the runner's lease
+  // short-poll and the dashboard API stay unthrottled. The public `/webhook`
+  // endpoint opts in (see registerWebhook) to blunt floods of unauthenticated
+  // (bad-HMAC) requests before they reach the signature check.
+  await app.register(rateLimit, { global: false });
 
   app.get("/health", async () => ({ ok: true }));
   app.get("/readyz", async () => ({ ok: true }));
