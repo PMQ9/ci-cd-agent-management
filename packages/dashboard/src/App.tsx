@@ -14,7 +14,7 @@ import {
 } from "./api.js";
 import { SizeSwitcher } from "./SizeSwitcher.js";
 import { ThemeSwitcher } from "./ThemeSwitcher.js";
-import { Badge, JobBadge, Panel } from "./ui.js";
+import { Badge, JobBadge, Panel, ReviewStatusBadge } from "./ui.js";
 
 type Tab = "repos" | "templates" | "prompts" | "pulls" | "runners" | "activity" | "usage";
 const TAB_LABELS: Record<Tab, string> = {
@@ -471,11 +471,29 @@ function PromptCard({ p, onChange }: { p: AgentPromptDTO; onChange: () => void }
   );
 }
 
+const ACTIVE_JOB_STATES = ["queued", "leased", "running"];
+
 function PullsPanel() {
   const { data, reload } = useAsync<PullRequestDTO[]>(() => api.pulls(), []);
+  const { data: runners, reload: reloadRunners } = useAsync<RunnerDTO[]>(() => api.runners(), []);
   const [syncing, setSyncing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Live-update status (queued → reviewing → reviewed) like the Runners/Activity panels.
+  useEffect(() => {
+    const t = setInterval(() => {
+      reload();
+      reloadRunners();
+    }, 5000);
+    return () => clearInterval(t);
+  }, [reload, reloadRunners]);
+
+  const anyRunnerOnline = (runners ?? []).some((r) => r.status === "online");
+  // A queued/leased/running review can't progress with no runner online → explain why.
+  const hasStalledQueue =
+    !anyRunnerOnline &&
+    (data ?? []).some((p) => p.jobState != null && ACTIVE_JOB_STATES.includes(p.jobState));
 
   const sync = async () => {
     setSyncing(true);
@@ -507,6 +525,8 @@ function PullsPanel() {
           ? `Queued review of ${pr.repoFullName} #${pr.number}.`
           : `Skipped: ${res.reason}`,
       );
+      // Reflect the freshly-queued job in the row right away (don't wait for the poll).
+      reload();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "error");
     } finally {
@@ -539,6 +559,12 @@ function PullsPanel() {
         not.
       </p>
       {msg && <div className="repo-msg">{msg}</div>}
+      {hasStalledQueue && (
+        <div className="repo-msg">
+          ⚠ No runner is online — queued reviews won't start until a runner connects (see the
+          Runners tab).
+        </div>
+      )}
       <div className="table-wrap">
         <table className="tbl" divide-="horizontal">
           <thead>
@@ -548,6 +574,7 @@ function PullsPanel() {
               <th>Title</th>
               <th className="nowrap">Author</th>
               <th className="nowrap">Updated</th>
+              <th className="nowrap">Status</th>
               <th className="nowrap" />
             </tr>
           </thead>
@@ -570,6 +597,13 @@ function PullsPanel() {
                   {p.prUpdatedAt ? new Date(p.prUpdatedAt).toLocaleString() : "—"}
                 </td>
                 <td className="nowrap">
+                  <ReviewStatusBadge
+                    state={p.jobState}
+                    errorMessage={p.jobErrorMessage}
+                    runnerOnline={anyRunnerOnline}
+                  />
+                </td>
+                <td className="nowrap">
                   <button
                     type="button"
                     className="btn-accent"
@@ -584,7 +618,7 @@ function PullsPanel() {
             ))}
             {!data?.length && (
               <tr>
-                <td colSpan={6} className="dim">
+                <td colSpan={7} className="dim">
                   No open PRs detected yet. Click “Sync from GitHub” to backfill existing ones.
                 </td>
               </tr>

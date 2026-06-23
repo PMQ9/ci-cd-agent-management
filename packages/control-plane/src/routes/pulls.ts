@@ -1,14 +1,31 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { requireUser } from "../auth.js";
 import { githubConfigured } from "../config.js";
 import { db } from "../db/client.js";
-import { pullRequests, repos } from "../db/schema.js";
+import { jobs, pullRequests, repos } from "../db/schema.js";
 import { syncOpenPullRequests } from "../github/pr-sync.js";
 
 export function registerPullRoutes(app: FastifyInstance): void {
   // Cross-repo open-PR inbox. Reads the registry only — cheap, no GitHub calls.
   app.get("/api/pulls", { preHandler: requireUser }, async () => {
+    // Latest job per (repo, PR). Supersede always inserts a NEWER job, so the
+    // newest createdAt is always the current attempt — `superseded` never wins.
+    const latest = db
+      .selectDistinctOn([jobs.repoId, jobs.prNumber], {
+        repoId: jobs.repoId,
+        prNumber: jobs.prNumber,
+        jobId: jobs.id,
+        jobState: jobs.state,
+        jobRound: jobs.round,
+        jobTrigger: jobs.trigger,
+        jobErrorMessage: jobs.errorMessage,
+        jobUpdatedAt: jobs.updatedAt,
+      })
+      .from(jobs)
+      .orderBy(jobs.repoId, jobs.prNumber, desc(jobs.createdAt))
+      .as("latest");
+
     const rows = await db
       .select({
         id: pullRequests.id,
@@ -21,9 +38,19 @@ export function registerPullRoutes(app: FastifyInstance): void {
         htmlUrl: pullRequests.htmlUrl,
         autoReviewEnabled: repos.autoReviewEnabled,
         prUpdatedAt: pullRequests.prUpdatedAt,
+        jobId: latest.jobId,
+        jobState: latest.jobState,
+        jobRound: latest.jobRound,
+        jobTrigger: latest.jobTrigger,
+        jobErrorMessage: latest.jobErrorMessage,
+        jobUpdatedAt: latest.jobUpdatedAt,
       })
       .from(pullRequests)
       .innerJoin(repos, eq(pullRequests.repoId, repos.id))
+      .leftJoin(
+        latest,
+        and(eq(latest.repoId, pullRequests.repoId), eq(latest.prNumber, pullRequests.number)),
+      )
       .where(eq(pullRequests.state, "open"))
       // Most-recently-updated first; null update times sink to the bottom
       // (Postgres defaults to NULLS FIRST on DESC, which we don't want).
@@ -31,6 +58,7 @@ export function registerPullRoutes(app: FastifyInstance): void {
     return rows.map((r) => ({
       ...r,
       prUpdatedAt: r.prUpdatedAt ? r.prUpdatedAt.toISOString() : null,
+      jobUpdatedAt: r.jobUpdatedAt ? r.jobUpdatedAt.toISOString() : null,
     }));
   });
 

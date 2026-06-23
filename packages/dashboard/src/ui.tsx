@@ -47,6 +47,44 @@ export function JobBadge({ state }: { state: string }) {
   );
 }
 
+// PR-row review status: friendlier than the raw job state (used on the Activity
+// tab via JobBadge). Maps the latest job's state to a plain-language label + tone,
+// and explains the "queued but nothing can run it" case when no runner is online.
+const REVIEW_STATUS: Record<string, { label: string; tone: Tone; cap?: string }> = {
+  queued: { label: "Queued", tone: "blue", cap: "slant-top" },
+  leased: { label: "Reviewing…", tone: "yellow", cap: "triangle" },
+  running: { label: "Reviewing…", tone: "yellow", cap: "triangle" },
+  succeeded: { label: "Reviewed ✓", tone: "green", cap: "round" },
+  failed: { label: "Failed", tone: "red", cap: "ribbon" },
+  cancelled: { label: "Cancelled", tone: "neutral" },
+  superseded: { label: "Superseded", tone: "neutral" },
+};
+
+export function ReviewStatusBadge({
+  state,
+  errorMessage,
+  runnerOnline,
+}: {
+  state: string | null;
+  errorMessage?: string | null;
+  runnerOnline?: boolean;
+}) {
+  if (!state) return <span className="dim">not reviewed</span>;
+  const m = REVIEW_STATUS[state] ?? { label: state, tone: "neutral" as Tone };
+  // A queued review can't start until a runner picks it up; if none is online it's
+  // effectively stalled, so say so right on the row.
+  const stalled = state === "queued" && runnerOnline === false;
+  return (
+    <>
+      <Badge tone={m.tone} cap={m.cap}>
+        {m.label}
+      </Badge>
+      {stalled && <span className="dim"> · no runner online ⚠</span>}
+      {state === "failed" && errorMessage && <div className="err">{errorMessage}</div>}
+    </>
+  );
+}
+
 /** A bordered panel with its title sitting on the top border line (TUI "legend" look). */
 export function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (

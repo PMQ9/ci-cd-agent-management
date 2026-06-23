@@ -11,7 +11,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { JOB_STATES } from "../../shared/src/index.js";
-import { Badge, JobBadge, Panel } from "../src/ui.js";
+import { Badge, JobBadge, Panel, ReviewStatusBadge } from "../src/ui.js";
 
 describe("JobBadge", () => {
   it.each(
@@ -48,6 +48,49 @@ describe("JobBadge", () => {
       expect(badge.className).not.toMatch(/\bb-/);
       expect(badge.getAttribute("variant-")).toBe("background2");
     }
+  });
+});
+
+describe("ReviewStatusBadge", () => {
+  it("renders 'not reviewed' (no badge) when there is no job", () => {
+    const { container } = render(<ReviewStatusBadge state={null} />);
+    expect(screen.getByText("not reviewed")).toBeInTheDocument();
+    expect(container.querySelector('[is-="badge"]')).toBeNull();
+  });
+
+  it.each([
+    ["queued", "Queued", "b-blue"],
+    ["leased", "Reviewing…", "b-yellow"],
+    ["running", "Reviewing…", "b-yellow"],
+    ["succeeded", "Reviewed ✓", "b-green"],
+    ["failed", "Failed", "b-red"],
+  ] as const)("maps '%s' to label '%s' with tone %s", (state, label, cls) => {
+    const { container } = render(<ReviewStatusBadge state={state} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(container.querySelector('[is-="badge"]')!.className).toContain(cls);
+  });
+
+  it("renders cancelled/superseded with a neutral badge (no colored class)", () => {
+    for (const state of ["cancelled", "superseded"]) {
+      const { container } = render(<ReviewStatusBadge state={state} />);
+      const badge = container.querySelector('[is-="badge"]')!;
+      expect(badge.className).not.toMatch(/\bb-/);
+    }
+  });
+
+  it("shows the 'no runner online' note for a queued review when none is online", () => {
+    render(<ReviewStatusBadge state="queued" runnerOnline={false} />);
+    expect(screen.getByText(/no runner online/i)).toBeInTheDocument();
+  });
+
+  it("omits the 'no runner online' note when a runner is online", () => {
+    render(<ReviewStatusBadge state="queued" runnerOnline={true} />);
+    expect(screen.queryByText(/no runner online/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the error message on a failed review", () => {
+    render(<ReviewStatusBadge state="failed" errorMessage="boom: claude not found" />);
+    expect(screen.getByText("boom: claude not found")).toBeInTheDocument();
   });
 });
 
