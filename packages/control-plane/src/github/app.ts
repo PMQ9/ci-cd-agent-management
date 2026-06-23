@@ -73,7 +73,7 @@ function renderFindingLine(f: AgentFinding): string {
  * mandatory "Reviewed by: <model>" line (stamped by the control plane, never the agent).
  * Empty sections render "None." so the posted review always matches the template shape.
  */
-function renderTemplateBody(opts: {
+export function renderTemplateBody(opts: {
   verdict: Verdict;
   summary: string;
   findings: AgentFinding[];

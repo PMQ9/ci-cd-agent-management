@@ -11,14 +11,14 @@ export interface AgentRunResult {
 }
 
 // An empty, valid ReviewOutput — used for the no-diff / unparseable fallbacks.
-function emptyReview(verdict: ReviewOutput["verdict"], summary: string): ReviewOutput {
+export function emptyReview(verdict: ReviewOutput["verdict"], summary: string): ReviewOutput {
   return { verdict, summary, findings: [], concerns: [], suggestedFixes: [] };
 }
 
 // The Claude Code JSON wrapper reports the resolved model differently across versions:
 // a top-level `model` string, or a `modelUsage` map keyed by model id. Try both; the
 // control plane stamps the "Reviewed by" line from whatever we return (null → unknown).
-function extractModel(wrapper: Record<string, any>): string | null {
+export function extractModel(wrapper: Record<string, any>): string | null {
   if (typeof wrapper.model === "string" && wrapper.model) return wrapper.model;
   if (wrapper.modelUsage && typeof wrapper.modelUsage === "object") {
     const keys = Object.keys(wrapper.modelUsage);
@@ -30,7 +30,7 @@ function extractModel(wrapper: Record<string, any>): string | null {
 // Fallback instruction builder, used only if the control plane did not send an
 // assembled reviewInstruction (e.g. an older control plane). The template-enforced
 // prompt is assembled on the control plane; see review-prompt.ts there.
-function buildInstruction(opts: {
+export function buildInstruction(opts: {
   repoFullName: string;
   prNumber: number;
   baseSha: string;
@@ -63,7 +63,7 @@ function buildInstruction(opts: {
   return lines.join("\n");
 }
 
-function extractJsonObject(text: string): unknown {
+export function extractJsonObject(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1]! : text;
   const start = candidate.indexOf("{");
@@ -72,7 +72,7 @@ function extractJsonObject(text: string): unknown {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
-function parseClaudeWrapper(stdout: string): AgentRunResult {
+export function parseClaudeWrapper(stdout: string): AgentRunResult {
   let wrapper: Record<string, any>;
   try {
     wrapper = JSON.parse(stdout);

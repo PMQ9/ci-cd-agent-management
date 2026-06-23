@@ -213,6 +213,9 @@ export async function recordError(
   costUsd: number | null,
   wallMs: number | null,
 ): Promise<void> {
+  // Idempotent like persistResult: a retried error report for an already-terminal
+  // job is a no-op, so a duplicate POST can't double-charge a usage event.
+  if (job.state !== "leased" && job.state !== "running") return;
   await db.transaction(async (tx) => {
     if (costUsd && costUsd > 0) {
       await tx.insert(usageEvents).values({
