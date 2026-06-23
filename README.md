@@ -5,6 +5,14 @@ review template you control** and posts the filled-in result — **using your Cl
 subscription, not the paid API.** Push fixes and it re-reviews, verifying what's resolved.
 Manage everything (templates, the agent's system prompt, repos, runs) from one dashboard.
 
+![Repositories tab — connected repos with per-repo model, daily cap, and review controls](docs/screenshots/repositories.png)
+
+![Review Templates tab — the structured rubric the agent must fill](docs/screenshots/review-templates.png)
+
+![System Prompts tab — editable reviewer prompt pieces with assembled-instruction preview](docs/screenshots/system-prompts.png)
+
+![Pull Requests tab — open PRs across connected repos with review status](docs/screenshots/pull-requests.png)
+
 ## Why this exists
 
 Claude Code reviews PRs great, but doing it by hand (open PR → run `claude` → paste
