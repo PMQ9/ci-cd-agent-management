@@ -81,8 +81,14 @@ export class AuthError extends Error {
   }
 }
 
+export interface AuthConfig {
+  githubConfigured: boolean;
+  devLoginAvailable: boolean;
+}
+
 export const api = {
   me: () => req<{ login: string }>("/auth/me"),
+  authConfig: () => req<AuthConfig>("/auth/config"),
   devLogin: () => req<{ ok: boolean }>("/auth/dev-login", { method: "POST", body: "{}" }),
   logout: () => req<{ ok: boolean }>("/auth/logout", { method: "POST", body: "{}" }),
 

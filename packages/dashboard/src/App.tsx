@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AuthError,
   api,
+  type AuthConfig,
   type InstallationsResponse,
   type JobDTO,
   type PullRequestDTO,
@@ -91,7 +92,15 @@ export function App() {
 }
 
 function LoginScreen() {
-  const dev = import.meta.env.DEV;
+  // Ask the backend what's available — `import.meta.env.DEV` is false in the local
+  // prod-preview build, so it can't tell a dev box from real production.
+  const [cfg, setCfg] = useState<AuthConfig | null>(null);
+  useEffect(() => {
+    api
+      .authConfig()
+      .then(setCfg)
+      .catch(() => setCfg({ githubConfigured: false, devLoginAvailable: false }));
+  }, []);
   return (
     <div className="center">
       <div className="login" box-="double">
@@ -99,10 +108,14 @@ function LoginScreen() {
           <span className="logo">◆</span>Agent PR Control Center
         </div>
         <p className="dim">Sign in to manage your repos, runners, and reviews.</p>
-        <a is-="button" className="btn-accent" href="/auth/login">
-          Sign in with GitHub
-        </a>
-        {dev && (
+        {cfg?.githubConfigured ? (
+          <a is-="button" className="btn-accent" href="/auth/login">
+            Sign in with GitHub
+          </a>
+        ) : (
+          <p className="warn">GitHub App not configured — set the GITHUB_* env vars to enable GitHub sign-in.</p>
+        )}
+        {cfg?.devLoginAvailable && (
           <button
             variant-="background2"
             onClick={() => api.devLogin().then(() => location.reload())}

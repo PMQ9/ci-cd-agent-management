@@ -39,6 +39,14 @@ export function requireUser(request: FastifyRequest, reply: FastifyReply, done: 
 }
 
 export function registerAuth(app: FastifyInstance): void {
+  // Public: lets the login screen decide which sign-in options to show without
+  // guessing from the frontend build mode (which is "production" in the local
+  // prod-preview, so it can't tell it's actually a dev box). No auth.
+  app.get("/auth/config", async () => ({
+    githubConfigured,
+    devLoginAvailable: !isProd,
+  }));
+
   app.get("/auth/login", async (request, reply) => {
     if (!githubConfigured) {
       return reply
