@@ -1,5 +1,5 @@
 import { App } from "@octokit/app";
-import type { AgentFinding, Verdict } from "@agentpr/shared";
+import type { AgentFinding, Severity, Verdict } from "@agentpr/shared";
 import { env, githubConfigured, loadPrivateKey } from "../config.js";
 
 let _app: App | null = null;
@@ -26,6 +26,22 @@ const VERDICT_EVENT: Record<Verdict, "APPROVE" | "REQUEST_CHANGES" | "COMMENT"> 
   comment: "COMMENT",
 };
 
+const VERDICT_LABEL: Record<Verdict, string> = {
+  approve: "Approve",
+  request_changes: "Request changes",
+  comment: "Comment",
+};
+
+// The template buckets findings into 3 levels; our severity enum has 5. Map them so no
+// severity silently vanishes from the rendered body.
+const SEVERITY_BUCKET: Record<Severity, "high" | "medium" | "low"> = {
+  critical: "high",
+  high: "high",
+  medium: "medium",
+  low: "low",
+  info: "low",
+};
+
 /**
  * Mint a fresh installation token scoped to ONE repo, valid ~1 hour. Handed to
  * the runner so it can clone exactly that repo and nothing else.
@@ -45,24 +61,60 @@ export async function mintRepoToken(
   return data.token;
 }
 
-function renderSummaryBody(
-  verdict: Verdict,
-  summary: string,
-  findings: AgentFinding[],
-  round: number,
-): string {
-  const header = `### 🤖 Agent review (round ${round}) — ${verdict.replace("_", " ")}`;
-  const lines = [header, "", summary, ""];
-  if (findings.length) {
-    lines.push(`**${findings.length} finding(s):**`, "");
-    for (const f of findings) {
-      const loc = f.line ? `${f.path}:${f.line}` : f.path;
-      lines.push(`- **[${f.severity}] ${f.title}** \`${loc}\``, `  ${f.body.replace(/\n/g, "\n  ")}`);
-    }
-  } else {
-    lines.push("_No issues found._");
-  }
-  lines.push("", "<sub>Posted by ci-cd-agent-management via your Claude subscription.</sub>");
+function renderFindingLine(f: AgentFinding): string {
+  const loc = f.line ? `${f.path}:${f.line}` : f.path;
+  const body = f.body.replace(/\n/g, "\n  ");
+  return `- **${f.title}** \`${loc}\`\n  ${body}`;
+}
+
+/**
+ * Render the agent's structured output AS the filled-in pr_review template: Review
+ * summary + Verdict, Findings bucketed 🔴/🟡/🟢, Concerns, Suggested fixes, and the
+ * mandatory "Reviewed by: <model>" line (stamped by the control plane, never the agent).
+ * Empty sections render "None." so the posted review always matches the template shape.
+ */
+function renderTemplateBody(opts: {
+  verdict: Verdict;
+  summary: string;
+  findings: AgentFinding[];
+  concerns: string[];
+  suggestedFixes: string[];
+  modelName: string;
+  round: number;
+}): string {
+  const buckets = { high: [] as AgentFinding[], medium: [] as AgentFinding[], low: [] as AgentFinding[] };
+  for (const f of opts.findings) buckets[SEVERITY_BUCKET[f.severity]].push(f);
+
+  const section = (items: AgentFinding[]) =>
+    items.length ? items.map(renderFindingLine).join("\n") : "None.";
+
+  const lines = [
+    `## Review summary`,
+    opts.summary,
+    `**Verdict:** ${VERDICT_LABEL[opts.verdict]}`,
+    ``,
+    `## Findings`,
+    ``,
+    `### 🔴 High`,
+    section(buckets.high),
+    ``,
+    `### 🟡 Medium`,
+    section(buckets.medium),
+    ``,
+    `### 🟢 Low`,
+    section(buckets.low),
+    ``,
+    `## Concerns`,
+    opts.concerns.length ? opts.concerns.map((c) => `- ${c}`).join("\n") : "None.",
+    ``,
+    `## Suggested fixes`,
+    opts.suggestedFixes.length
+      ? opts.suggestedFixes.map((s, i) => `${i + 1}. ${s}`).join("\n")
+      : "None.",
+    ``,
+    `---`,
+    `**Reviewed by:** ${opts.modelName} · round ${opts.round} · ci-cd-agent-management (your Claude subscription)`,
+  ];
   return lines.join("\n");
 }
 
@@ -79,10 +131,13 @@ export async function postReview(opts: {
   verdict: Verdict;
   summary: string;
   findings: AgentFinding[];
+  concerns: string[];
+  suggestedFixes: string[];
+  modelName: string;
   round: number;
 }): Promise<number> {
   const octokit = await getApp().getInstallationOctokit(opts.installationId);
-  const body = renderSummaryBody(opts.verdict, opts.summary, opts.findings, opts.round);
+  const body = renderTemplateBody(opts);
   const event = VERDICT_EVENT[opts.verdict];
 
   const inline = opts.findings

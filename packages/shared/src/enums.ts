@@ -43,3 +43,8 @@ export type RunnerStatus = (typeof RUNNER_STATUSES)[number];
 
 export const PR_STATES = ["open", "closed", "merged"] as const;
 export type PrState = (typeof PR_STATES)[number];
+
+// Kinds of review/contribution templates stored in the system. `pr_review` is the
+// rubric the AI reviewer is forced to fill; the others are reference/auxiliary.
+export const TEMPLATE_KINDS = ["pr_review", "pull_request", "security_review"] as const;
+export type TemplateKind = (typeof TEMPLATE_KINDS)[number];

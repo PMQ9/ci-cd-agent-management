@@ -39,7 +39,9 @@ GitHub ──webhook(HMAC)──▶ control-plane ──┐  posts review (Revie
   truth; types are inferred from them. `enums.ts` exports the canonical enum tuples that
   BOTH Zod and the Drizzle `pgEnum`s import (so DB and app can't drift).
   - `enums.ts` (value tuples), `domain.ts` (entities), `contracts.ts` (wire DTOs +
-    `ReviewOutputSchema`, the JSON shape the agent must emit).
+    `ReviewOutputSchema`, the JSON shape the agent must emit, + `REVIEW_OUTPUT_CONTRACT_PROMPT`,
+    the code-fixed "emit exactly this JSON" instruction co-located with the schema so prompt
+    and parser can't drift).
   - ⚠️ Internal imports here are **extensionless** (`./enums`, not `./enums.js`) so
     drizzle-kit can load the schema. Keep it that way.
 - **`packages/control-plane`** — Fastify API on `:8080`.
@@ -49,22 +51,37 @@ GitHub ──webhook(HMAC)──▶ control-plane ──┐  posts review (Revie
   - `queue.ts` — **the heart**: `enqueueReview`, `leaseNextJob` (SKIP LOCKED + runner
     affinity), `persistResult` (txn), `recordError`, `sweepExpiredLeases`,
     `autoReviewBlockedReason` (spend guard).
-  - `github/app.ts` (`mintRepoToken` 1h/single-repo, `postReview` w/ inline→summary
-    fallback, `getPrRefs`), `github/sync.ts` (mirror installs/repos).
+  - `github/app.ts` (`mintRepoToken` 1h/single-repo, `postReview` — renders the agent's
+    structured output AS the filled-in PR Review template via `renderTemplateBody`
+    (verdict, findings bucketed 🔴/🟡/🟢, concerns, suggested fixes, control-plane-stamped
+    `Reviewed by: <model>`); still posts inline per-finding comments w/ summary fallback),
+    `github/sync.ts` (mirror installs/repos).
+  - `review-prompt.ts` — assembles the reviewer instruction (persona + template-adherence
+    rules + the active `pr_review` template + prior findings + the fixed JSON contract) from
+    DB-backed editable pieces. Pure `assembleReviewInstruction` shared by the lease handler
+    and the `/api/prompts/preview` route, so preview == what runs.
+  - `seed-data.ts` (template + prompt defaults, embedded as constants — the source files
+    live in sibling repos not in the image) + `seed.ts` (`seedDefaults`, insert-if-absent
+    on boot so dashboard edits aren't clobbered).
   - `review-service.ts` — `triggerReviewForPr`, the ONE entry point for auto / manual /
     command triggers (draft-skip + spend cap apply to `auto` only).
   - `webhook.ts` (HMAC via `crypto.timingSafeEqual`; routes pull_request, issue_comment,
     installation*), `auth.ts` (GitHub App user-OAuth login, single-login allowlist,
-    signed cookie, non-prod `/auth/dev-login`), `routes/*` (repos, runners, jobs, usage),
-    `server.ts`, `index.ts`.
+    signed cookie, non-prod `/auth/dev-login`), `routes/*` (repos, runners, jobs, usage,
+    `templates`, `prompts`), `server.ts`, `index.ts`.
 - **`packages/runner`** — the daemon. `main.ts` (enroll → poll → handle job),
   `client.ts`, `checkout.ts` (git fetch via `http.extraheader` so the token stays out of
-  URLs/logs), `exec-claude.ts` (builds the prompt, spawns `claude -p`, parses the JSON
-  wrapper + the agent's `ReviewOutput`, refuses if `ANTHROPIC_API_KEY` is set).
+  URLs/logs), `exec-claude.ts` (runs `leaseJob.reviewInstruction` assembled by the control
+  plane — local `buildInstruction` is now only a fallback for an old control plane; spawns
+  `claude -p`, parses the JSON wrapper + the agent's `ReviewOutput`, captures the resolved
+  model from the wrapper, refuses if `ANTHROPIC_API_KEY` is set). Runner `capabilities.version`
+  is `0.2.0` (template-aware); see the version-gating gotcha below.
 - **`packages/dashboard`** — Vite + React SPA, styled as a terminal UI with
   **[WebTUI](https://webtui.ironclad.sh)** (`@webtui/css` + 5 theme plugins). `api.ts`
-  (typed client, `credentials: include`), `App.tsx` (left sidebar + Repos / Pull Requests /
-  Runners / Activity / Usage panels), `ui.tsx` (`Panel`/`Badge`/`JobBadge` helpers),
+  (typed client, `credentials: include`), `App.tsx` (left sidebar + Repos / Review Templates /
+  System Prompts / Pull Requests / Runners / Activity / Usage panels — the Templates and
+  Prompts panels are edit-on-blur over `/api/templates` + `/api/prompts`, mirroring `RepoRow`),
+  `ui.tsx` (`Panel`/`Badge`/`JobBadge` helpers),
   `theme.ts` + `ThemeSwitcher.tsx` (live theme switch, persisted to `localStorage`),
   `webtui.d.ts` (types WebTUI's `is-`/`box-`/`variant-`/`cap-`/`size-` attributes for JSX).
   - WebTUI is **attribute-styled** (`is-="badge"`, `box-="round"`, …) and **layer-based**:
@@ -82,9 +99,14 @@ GitHub ──webhook(HMAC)──▶ control-plane ──┐  posts review (Revie
 `users` (single-login allowlist), `installations`, `repos` (`autoReviewEnabled` = the
 per-repo toggle, default false; `provider`, `model`, `dailyCostCapUsd`), `runners`
 (`tokenHash`, capabilities), **`jobs`** (the queue: `state`, `leaseId`, `leasedByRunner`,
-`leaseExpiresAt`, `round`, `preferredRunnerId`, `claudeSessionId`), `reviews`,
-`findings` (`prevFindingId` links the same issue across rounds), `usage_events`
-(append-only; analytics + spend cap are SUM/GROUP-BY over this).
+`leaseExpiresAt`, `round`, `preferredRunnerId`, `claudeSessionId`), `reviews` (now also
+`concerns`/`suggestedFixes` jsonb — the template sections beyond findings), `findings`
+(`prevFindingId` links the same issue across rounds), `usage_events` (append-only;
+`model` is now the resolved model the runner reported; analytics + spend cap are
+SUM/GROUP-BY over this), `templates` (review/contribution templates; one `pr_review` row
+`isActive` = the enforced rubric, guarded by a partial unique index; global, not per-repo),
+`agent_prompts` (editable reviewer system-prompt pieces, keyed by `key`; `editable=false`
+rows are read-only).
 
 ## Job lifecycle
 
@@ -95,10 +117,13 @@ per-repo toggle, default false; `provider`, `model`, `dailyCostCapUsd`), `runner
    and retries when empty) → `leaseNextJob` atomically claims a job (`leased`,
    `leaseExpiresAt`). Affinity: jobs preferred for this runner first.
 3. Control plane assembles a `LeaseJob`: mints a 1h single-repo token, attaches prior
-   findings (round > 1) and `resumeSessionId`.
-4. Runner checks out the PR diff, runs `claude -p`, POSTs `JobResult` (idempotent on
-   `leaseId`). `persistResult` writes review+findings+usage and flips job to `succeeded`.
-5. Control plane posts the review to GitHub (it holds the App key) and stores the review id.
+   findings (round > 1), `resumeSessionId`, and `reviewInstruction` (the template-enforced
+   prompt from `assembleReviewInstruction`).
+4. Runner checks out the PR diff, runs `claude -p` with `reviewInstruction`, POSTs
+   `JobResult` (idempotent on `leaseId`) incl. `concerns`/`suggestedFixes`/`modelUsed`.
+   `persistResult` writes review+findings+usage and flips job to `succeeded`.
+5. Control plane posts the review to GitHub (it holds the App key), rendered as the filled
+   template, and stores the review id.
 6. Crash safety: `sweepExpiredLeases` requeues `leased` jobs past their TTL. Triggered by
    the in-process 30s timer locally/on the VM (`ENABLE_INPROCESS_SWEEP`), or by Cloud
    Scheduler → `POST /internal/sweep` on Cloud Run (where the timer can't fire at zero).
@@ -149,6 +174,19 @@ After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
   (`provider !== "claude_code"` throws). Implementing it = a free non-Claude backend only.
 - **Submitted GitHub reviews can't be edited** → every re-review is a NEW review object
   (`reviews.round`).
+- **Template enforcement is runner-version-gated.** The control plane sends the assembled
+  `reviewInstruction`, but an older runner (Zod strips the unknown field) silently falls back
+  to its local freestyle `buildInstruction` — no crash, but the template isn't enforced. The
+  runner must be on `capabilities.version` `0.2.0`+ (check the Runners tab). New `JobResult`
+  fields (`concerns`/`suggestedFixes`/`modelUsed`) are all **optional** for the same reason:
+  a required field would 400 an un-upgraded runner's result and lose the review.
+- **The `Reviewed by: <model>` name comes from the runner, not `repo.model`.** `exec-claude.ts`
+  reads the resolved model from the `claude -p` JSON wrapper (`wrapper.model` → `wrapper.modelUsage`).
+  ⚠️ That key is **unverified** against a live envelope — if absent, `modelUsed` is null and the
+  control plane stamps `repo.model ?? "unknown model"`. Confirm the key before relying on it.
+- **Don't make the JSON output contract user-editable.** `REVIEW_OUTPUT_CONTRACT_PROMPT` lives in
+  `shared` and is always appended by the assembler; the `/api/prompts` route exposes it read-only
+  (`editable=false`) so a dashboard edit can't break result parsing.
 - **pnpm build approval:** esbuild's build script must be approved (`allowBuilds: esbuild:
   true` in `pnpm-workspace.yaml`) or `pnpm install` hard-fails under the supply-chain policy.
 - **Scale-to-zero kills the in-process sweep timer:** on Cloud Run the frozen instance can't
@@ -164,6 +202,10 @@ After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
 - **New API route:** add `src/routes/<x>.ts`, register in `server.ts`, guard with
   `requireUser`. Validate input with a Zod schema; return the error envelope on failure.
 - **New trigger surface:** call `triggerReviewForPr` — don't re-implement enqueue logic.
+- **Changing the review prompt/template:** edit the `agent_prompts` rows / active `templates`
+  row (dashboard or DB) — do NOT hardcode prompt text in the runner. Assembly lives in
+  `review-prompt.ts`; the JSON contract stays in `shared`. Add new seed defaults to
+  `seed-data.ts` (insert-if-absent, so existing rows aren't overwritten).
 - **OpenCode provider (Phase 6):** add `exec-opencode.ts` mirroring `exec-claude.ts`
   (`opencode run --model <provider/model> --output-format json` or `opencode serve`),
   branch on `job.provider` in `runner/main.ts`. Keep the same `JobResult` contract.

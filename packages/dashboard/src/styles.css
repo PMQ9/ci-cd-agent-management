@@ -339,6 +339,47 @@
     cursor: pointer;
   }
 
+  /* ---- templates / system prompts --------------------------------------- */
+  .tpl-field {
+    width: 100%;
+    margin-top: 1lh;
+  }
+  .tpl-text {
+    width: 100%;
+    min-height: 14lh;
+    margin-top: 0.25lh;
+    resize: vertical;
+    font-family: var(--font-family);
+    font-size: 0.9em;
+    line-height: var(--line-height);
+    color: var(--foreground0);
+    background: var(--background0);
+    border: 2px solid var(--background3);
+    padding: 0.5lh 1ch;
+  }
+  .tpl-text:focus {
+    border-color: var(--acc-blue);
+    outline: none;
+  }
+  .tpl-text[readonly] {
+    color: var(--foreground2);
+    background: var(--background1);
+    cursor: default;
+  }
+  .tpl-preview {
+    margin-top: 1lh;
+    max-height: 40lh;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    font-size: 0.85em;
+    color: var(--foreground1);
+    background: var(--background0);
+    border: 2px solid var(--background3);
+    padding: 0.5lh 1ch;
+  }
+
   /* ---- tables ------------------------------------------------------------ */
   /* A too-narrow viewport scrolls the table *inside* the panel instead of crushing
      columns or pushing the panel border off-screen. Pairs with .layout's minmax(0,…). */

@@ -1,10 +1,12 @@
 import { env } from "./config.js";
 import { runMigrations } from "./db/migrate.js";
 import { sweepExpiredLeases } from "./queue.js";
+import { seedDefaults } from "./seed.js";
 import { buildServer } from "./server.js";
 
 if (env.AUTO_MIGRATE !== "false") {
   await runMigrations();
+  await seedDefaults();
 }
 
 const app = await buildServer();

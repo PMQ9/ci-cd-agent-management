@@ -1,8 +1,9 @@
 # Agent PR Control Center
 
-Open a pull request → a terminal AI agent (Claude Code) reviews it and posts feedback —
-**using your Claude subscription, not the paid API.** Push fixes and it re-reviews,
-verifying what's resolved. Manage everything from one dashboard.
+Open a pull request → a terminal AI agent (Claude Code) reviews it against a **structured
+review template you control** and posts the filled-in result — **using your Claude
+subscription, not the paid API.** Push fixes and it re-reviews, verifying what's resolved.
+Manage everything (templates, the agent's system prompt, repos, runs) from one dashboard.
 
 ## Why this exists
 
@@ -31,6 +32,27 @@ GitHub  ──webhook──▶  Control plane (GCP Cloud Run, scale-to-zero) ─
 - **Auto-review is opt-in per repo** (manual is the default). Draft PRs are skipped.
   Trigger manually with a dashboard button or a `/review` PR comment. An optional daily
   spend cap auto-pauses auto-review.
+- **Reviews are template-enforced, not freestyle.** The active *PR Review* template is the
+  rubric the agent must fill; the posted review is rendered as that template (verdict,
+  findings bucketed 🔴/🟡/🟢, concerns, suggested fixes, `Reviewed by: <model>`). Edit the
+  template and the agent's system prompt live in the dashboard — no redeploy.
+
+## Review templates & system prompts
+
+Two dashboard tabs make the review fully yours to shape:
+
+- **Review Templates** — the templates the system knows about (seeded from
+  [gh-templates](https://github.com/PMQ9): PR Review, PR Description, Secure Code Review).
+  The one marked *active rubric* is what every AI review must fill. Edit the markdown in
+  place; the next review uses it.
+- **System Prompts** — the reviewer's system prompt in editable pieces (persona,
+  template-adherence rules, re-review addendum). The JSON output contract is shown
+  read-only so the result parser can't be broken from the UI. "Preview assembled
+  instruction" shows exactly what the runner sends to `claude -p`.
+
+The prompt is assembled on the control plane (DB-backed, editable) and shipped to the
+runner per job, so changes apply with no redeploy. The posted GitHub review is rendered
+*as* the filled template, including a control-plane-stamped `Reviewed by: <model>` line.
 
 ## Quick start (local dev)
 
@@ -77,7 +99,7 @@ Flags: `--build` (compile the control plane too, max fidelity), `--no-watch`, `-
 | `packages/shared` | Zod schemas = the one source of truth for types & the wire contract |
 | `packages/control-plane` | Fastify API, GitHub App, webhook, Postgres job queue, auth |
 | `packages/runner` | The daemon that runs `claude -p` where you're logged in |
-| `packages/dashboard` | React command center (repos, runners, activity, usage) |
+| `packages/dashboard` | React command center (repos, review templates, system prompts, runners, activity, usage) |
 
 For architecture details and conventions, see [CLAUDE.md](CLAUDE.md).
 

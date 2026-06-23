@@ -4,11 +4,32 @@ import { ReviewOutputSchema, type PriorFinding, type ReviewOutput } from "@agent
 export interface AgentRunResult {
   review: ReviewOutput;
   sessionId: string | null;
+  modelUsed: string | null;
   totalCostUsd: number;
   inputTokens: number | null;
   outputTokens: number | null;
 }
 
+// An empty, valid ReviewOutput — used for the no-diff / unparseable fallbacks.
+function emptyReview(verdict: ReviewOutput["verdict"], summary: string): ReviewOutput {
+  return { verdict, summary, findings: [], concerns: [], suggestedFixes: [] };
+}
+
+// The Claude Code JSON wrapper reports the resolved model differently across versions:
+// a top-level `model` string, or a `modelUsage` map keyed by model id. Try both; the
+// control plane stamps the "Reviewed by" line from whatever we return (null → unknown).
+function extractModel(wrapper: Record<string, any>): string | null {
+  if (typeof wrapper.model === "string" && wrapper.model) return wrapper.model;
+  if (wrapper.modelUsage && typeof wrapper.modelUsage === "object") {
+    const keys = Object.keys(wrapper.modelUsage);
+    if (keys.length) return keys[0]!;
+  }
+  return null;
+}
+
+// Fallback instruction builder, used only if the control plane did not send an
+// assembled reviewInstruction (e.g. an older control plane). The template-enforced
+// prompt is assembled on the control plane; see review-prompt.ts there.
 function buildInstruction(opts: {
   repoFullName: string;
   prNumber: number;
@@ -58,8 +79,9 @@ function parseClaudeWrapper(stdout: string): AgentRunResult {
   } catch {
     // Not JSON at all — treat the whole stdout as a plain comment.
     return {
-      review: { verdict: "comment", summary: stdout.slice(0, 4000) || "(empty agent output)", findings: [] },
+      review: emptyReview("comment", stdout.slice(0, 4000) || "(empty agent output)"),
       sessionId: null,
+      modelUsed: null,
       totalCostUsd: 0,
       inputTokens: null,
       outputTokens: null,
@@ -70,6 +92,7 @@ function parseClaudeWrapper(stdout: string): AgentRunResult {
   const usage = wrapper.usage ?? {};
   const base = {
     sessionId: typeof wrapper.session_id === "string" ? wrapper.session_id : null,
+    modelUsed: extractModel(wrapper),
     totalCostUsd: typeof wrapper.total_cost_usd === "number" ? wrapper.total_cost_usd : 0,
     inputTokens: typeof usage.input_tokens === "number" ? usage.input_tokens : null,
     outputTokens: typeof usage.output_tokens === "number" ? usage.output_tokens : null,
@@ -83,7 +106,7 @@ function parseClaudeWrapper(stdout: string): AgentRunResult {
     /* fall through to comment fallback */
   }
   return {
-    review: { verdict: "comment", summary: resultText.slice(0, 4000) || "(no structured output)", findings: [] },
+    review: emptyReview("comment", resultText.slice(0, 4000) || "(no structured output)"),
     ...base,
   };
 }
@@ -131,6 +154,9 @@ export async function runClaudeReview(opts: {
   priorFindings: PriorFinding[];
   resumeSessionId: string | null;
   model: string | null;
+  // The template-enforced instruction assembled by the control plane. When absent
+  // (older control plane), fall back to the local builder.
+  reviewInstruction?: string | null;
   timeoutMs: number;
 }): Promise<AgentRunResult> {
   // The load-bearing guard: a stray API key silently bills pay-per-token.
@@ -142,7 +168,7 @@ export async function runClaudeReview(opts: {
 
   const args = [
     "-p",
-    buildInstruction(opts),
+    opts.reviewInstruction || buildInstruction(opts),
     "--output-format",
     "json",
     "--permission-mode",
@@ -158,8 +184,9 @@ export async function runClaudeReview(opts: {
 
   if (!opts.diff.trim()) {
     return {
-      review: { verdict: "comment", summary: "No diff between base and head — nothing to review.", findings: [] },
+      review: emptyReview("comment", "No diff between base and head — nothing to review."),
       sessionId: null,
+      modelUsed: null,
       totalCostUsd: 0,
       inputTokens: null,
       outputTokens: null,

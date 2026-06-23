@@ -2,20 +2,24 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AuthError,
   api,
+  type AgentPromptDTO,
   type AuthConfig,
   type InstallationsResponse,
   type JobDTO,
   type PullRequestDTO,
   type RepoDTO,
   type RunnerDTO,
+  type TemplateDTO,
   type UsageSummary,
 } from "./api.js";
 import { Badge, JobBadge, Panel } from "./ui.js";
 import { ThemeSwitcher } from "./ThemeSwitcher.js";
 
-type Tab = "repos" | "pulls" | "runners" | "activity" | "usage";
+type Tab = "repos" | "templates" | "prompts" | "pulls" | "runners" | "activity" | "usage";
 const TAB_LABELS: Record<Tab, string> = {
   repos: "Repositories",
+  templates: "Review Templates",
+  prompts: "System Prompts",
   pulls: "Pull Requests",
   runners: "Runners",
   activity: "Activity",
@@ -23,12 +27,14 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 const NAV_GLYPH: Record<Tab, string> = {
   repos: "▤",
+  templates: "▦",
+  prompts: "✎",
   pulls: "⇄",
   runners: "◇",
   activity: "◷",
   usage: "$",
 };
-const ORDER: Tab[] = ["repos", "pulls", "runners", "activity", "usage"];
+const ORDER: Tab[] = ["repos", "templates", "prompts", "pulls", "runners", "activity", "usage"];
 
 export function App() {
   const [login, setLogin] = useState<string | null>(null);
@@ -81,6 +87,8 @@ export function App() {
       <main className="content">
         <Panel title={TAB_LABELS[tab]}>
           {tab === "repos" && <ReposPanel />}
+          {tab === "templates" && <TemplatesPanel />}
+          {tab === "prompts" && <PromptsPanel />}
           {tab === "pulls" && <PullsPanel />}
           {tab === "runners" && <RunnersPanel />}
           {tab === "activity" && <ActivityPanel />}
@@ -277,6 +285,161 @@ function RepoRow({ repo, onChange }: { repo: RepoDTO; onChange: () => void }) {
           </button>
         </div>
       </div>
+      {msg && <div className="repo-msg">{msg}</div>}
+    </div>
+  );
+}
+
+const KIND_LABEL: Record<TemplateDTO["kind"], string> = {
+  pr_review: "PR review",
+  pull_request: "PR description",
+  security_review: "security",
+};
+
+function TemplatesPanel() {
+  const { data, reload } = useAsync<TemplateDTO[]>(() => api.templates(), []);
+  return (
+    <>
+      <div className="panel-head">
+        <span className="dim">
+          Templates the system knows about. The <strong>active PR review</strong> template is the
+          rubric every AI review is forced to fill — edit it here and reviews use it on the next run.
+        </span>
+      </div>
+      {!data?.length && <p className="dim">No templates yet.</p>}
+      {data?.map((t) => (
+        <TemplateCard key={t.id} t={t} onChange={reload} />
+      ))}
+    </>
+  );
+}
+
+function TemplateCard({ t, onChange }: { t: TemplateDTO; onChange: () => void }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const patch = (p: Partial<Pick<TemplateDTO, "content" | "description" | "isActive">>) =>
+    api
+      .updateTemplate(t.id, p)
+      .then(() => {
+        setMsg("Saved.");
+        onChange();
+      })
+      .catch((e) => setMsg(e instanceof Error ? e.message : "error"));
+
+  return (
+    <div className="repo" box-="round">
+      <div className="repo-head">
+        <span className="repo-name">{t.name}</span>
+        <Badge tone="mauve" cap="round">
+          {KIND_LABEL[t.kind]}
+        </Badge>
+        {t.isActive && (
+          <Badge tone="green" cap="round">
+            active rubric
+          </Badge>
+        )}
+        <div is-="separator" variant-="foreground2" className="connector" />
+        {t.kind === "pr_review" && !t.isActive && (
+          <button size-="small" variant-="background2" onClick={() => patch({ isActive: true })}>
+            Set as active rubric
+          </button>
+        )}
+      </div>
+      {t.description && <p className="panel-desc">{t.description}</p>}
+      <label className="field tpl-field">
+        Template content (markdown)
+        <textarea
+          className="tpl-text"
+          defaultValue={t.content}
+          spellCheck={false}
+          onBlur={(e) => {
+            if (e.target.value !== t.content) patch({ content: e.target.value });
+          }}
+        />
+      </label>
+      {msg && <div className="repo-msg">{msg}</div>}
+    </div>
+  );
+}
+
+function PromptsPanel() {
+  const { data, reload } = useAsync<AgentPromptDTO[]>(() => api.prompts(), []);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  const showPreview = async () => {
+    setPreviewing(true);
+    try {
+      const r = await api.promptPreview();
+      setPreview(r.instruction);
+    } catch (e) {
+      setPreview(e instanceof Error ? e.message : "error");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="panel-head between">
+        <span className="dim">
+          The system prompt the AI reviewer runs with, in editable pieces. Changes apply to the next
+          review. The output contract is fixed so the result parser can’t break.
+        </span>
+        <button size-="small" variant-="background2" disabled={previewing} onClick={showPreview}>
+          {previewing ? "…" : "Preview assembled instruction"}
+        </button>
+      </div>
+      {data?.map((p) => (
+        <PromptCard key={p.key} p={p} onChange={reload} />
+      ))}
+      {preview && (
+        <div className="repo" box-="round">
+          <div className="repo-head">
+            <span className="repo-name">Assembled instruction</span>
+            <span className="dim small">exactly what the runner sends to claude -p</span>
+          </div>
+          <pre className="tpl-preview">{preview}</pre>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PromptCard({ p, onChange }: { p: AgentPromptDTO; onChange: () => void }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const save = (content: string) => {
+    if (content === p.content) return;
+    api
+      .updatePrompt(p.key, content)
+      .then(() => {
+        setMsg("Saved.");
+        onChange();
+      })
+      .catch((e) => setMsg(e instanceof Error ? e.message : "error"));
+  };
+
+  return (
+    <div className="repo" box-="round">
+      <div className="repo-head">
+        <span className="repo-name">{p.label}</span>
+        {!p.editable && (
+          <Badge tone="peach" cap="round">
+            read-only
+          </Badge>
+        )}
+        <div is-="separator" variant-="foreground2" className="connector" />
+        <code className="dim small">{p.key}</code>
+      </div>
+      {p.description && <p className="panel-desc">{p.description}</p>}
+      <label className="field tpl-field">
+        <textarea
+          className="tpl-text"
+          defaultValue={p.content}
+          readOnly={!p.editable}
+          spellCheck={false}
+          onBlur={p.editable ? (e) => save(e.target.value) : undefined}
+        />
+      </label>
       {msg && <div className="repo-msg">{msg}</div>}
     </div>
   );

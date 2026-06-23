@@ -58,6 +58,26 @@ export interface UsageSummary {
   claudeConsoleUrl: string;
 }
 
+export interface TemplateDTO {
+  id: string;
+  slug: string;
+  name: string;
+  kind: "pr_review" | "pull_request" | "security_review";
+  description: string;
+  content: string;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface AgentPromptDTO {
+  key: string;
+  label: string;
+  description: string;
+  content: string;
+  editable: boolean;
+  updatedAt: string | null;
+}
+
 export interface InstallationsResponse {
   installations: { id: number; accountLogin: string; repoSelection: string }[];
   installUrl: string | null;
@@ -118,4 +138,16 @@ export const api = {
       method: "POST",
       body: "{}",
     }),
+
+  templates: () => req<TemplateDTO[]>("/api/templates"),
+  updateTemplate: (id: string, patch: Partial<Pick<TemplateDTO, "content" | "description" | "isActive">>) =>
+    req<{ ok: boolean }>(`/api/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+
+  prompts: () => req<AgentPromptDTO[]>("/api/prompts"),
+  updatePrompt: (key: string, content: string) =>
+    req<{ ok: boolean }>(`/api/prompts/${encodeURIComponent(key)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    }),
+  promptPreview: () => req<{ instruction: string; templateName: string }>("/api/prompts/preview"),
 };

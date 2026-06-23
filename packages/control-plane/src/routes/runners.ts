@@ -21,6 +21,7 @@ import {
   setReviewGithubId,
   touchRunner,
 } from "../queue.js";
+import { assembleReviewInstruction, loadReviewPromptParts } from "../review-prompt.js";
 import { requireUser } from "../auth.js";
 import { safeEqualHex, sha256, randomToken } from "../util/crypto.js";
 
@@ -86,6 +87,14 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
     const [owner, name] = repo.fullName.split("/");
     const githubToken = await mintRepoToken(repo.installationId, name!);
     const priorFindings = job.round > 1 ? await priorFindingsForPr(repo.id, job.prNumber) : [];
+    const reviewInstruction = assembleReviewInstruction(await loadReviewPromptParts(), {
+      repoFullName: repo.fullName,
+      prNumber: job.prNumber,
+      baseSha: job.baseSha,
+      headSha: job.headSha,
+      round: job.round,
+      priorFindings,
+    });
     const leaseJob: LeaseJob = {
       jobId: job.id,
       leaseId: job.leaseId!,
@@ -98,6 +107,7 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
       model: repo.model,
       round: job.round,
       githubToken,
+      reviewInstruction,
       resumeSessionId: job.claudeSessionId,
       priorFindings,
     };
@@ -132,6 +142,9 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
           verdict: parsed.data.verdict,
           summary: parsed.data.summary,
           findings: parsed.data.findings,
+          concerns: parsed.data.concerns,
+          suggestedFixes: parsed.data.suggestedFixes,
+          modelName: parsed.data.modelUsed ?? repo.model ?? "unknown model",
           round: job.round,
         });
         await setReviewGithubId(persisted.reviewId, githubReviewId);

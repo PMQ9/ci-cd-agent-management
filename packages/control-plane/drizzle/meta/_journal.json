@@ -15,6 +15,13 @@
       "when": 1782170069131,
       "tag": "0001_yielding_vector",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782218134584,
+      "tag": "0002_robust_whiplash",
+      "breakpoints": true
     }
   ]
 }

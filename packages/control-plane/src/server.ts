@@ -4,9 +4,11 @@ import { env, isProd } from "./config.js";
 import { registerAuth } from "./auth.js";
 import { sweepExpiredLeases } from "./queue.js";
 import { registerJobRoutes } from "./routes/jobs.js";
+import { registerPromptRoutes } from "./routes/prompts.js";
 import { registerPullRoutes } from "./routes/pulls.js";
 import { registerRepoRoutes } from "./routes/repos.js";
 import { registerRunnerRoutes } from "./routes/runners.js";
+import { registerTemplateRoutes } from "./routes/templates.js";
 import { registerUsageRoutes } from "./routes/usage.js";
 import { safeEqualHex } from "./util/crypto.js";
 import { registerWebhook } from "./webhook.js";
@@ -61,6 +63,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   registerPullRoutes(app);
   registerJobRoutes(app);
   registerUsageRoutes(app);
+  registerTemplateRoutes(app);
+  registerPromptRoutes(app);
 
   // Optionally serve the prebuilt dashboard from the same origin.
   if (env.DASHBOARD_DIST) {

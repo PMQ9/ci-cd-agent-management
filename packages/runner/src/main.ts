@@ -25,7 +25,7 @@ async function ensureEnrolled(client: ControlPlaneClient): Promise<void> {
   const res = await client.enroll({
     enrollmentSecret: env.RUNNER_ENROLLMENT_SECRET_CLIENT,
     name: env.RUNNER_NAME || hostname(),
-    capabilities: { providers: ["claude_code"], version: "0.1.0" },
+    capabilities: { providers: ["claude_code"], version: "0.2.0" },
   });
   await saveCreds(env.RUNNER_CRED_FILE, res);
   client.setToken(res.runnerToken);
@@ -60,6 +60,7 @@ async function handleJob(client: ControlPlaneClient, job: LeaseJob): Promise<voi
       priorFindings: job.priorFindings,
       resumeSessionId: job.resumeSessionId,
       model: job.model,
+      reviewInstruction: job.reviewInstruction,
       timeoutMs: env.CLAUDE_TIMEOUT_MS,
     });
     await client.reportResult({
@@ -68,6 +69,9 @@ async function handleJob(client: ControlPlaneClient, job: LeaseJob): Promise<voi
       verdict: result.review.verdict,
       summary: result.review.summary,
       findings: result.review.findings,
+      concerns: result.review.concerns,
+      suggestedFixes: result.review.suggestedFixes,
+      modelUsed: result.modelUsed,
       totalCostUsd: result.totalCostUsd,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,

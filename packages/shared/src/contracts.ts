@@ -18,8 +18,33 @@ export const ReviewOutputSchema = z.object({
   verdict: z.enum(VERDICTS),
   summary: z.string().min(1).describe("1-3 sentence overall summary"),
   findings: z.array(AgentFindingSchema),
+  // Template sections beyond findings. Optional + default [] so older runners /
+  // agents that omit them never break parsing.
+  concerns: z
+    .array(z.string())
+    .default([])
+    .describe("open questions / risky assumptions / out-of-scope flags"),
+  suggestedFixes: z
+    .array(z.string())
+    .default([])
+    .describe("prioritized concrete actions, reference file:line where possible"),
 });
 export type ReviewOutput = z.infer<typeof ReviewOutputSchema>;
+
+// The canonical "emit exactly this JSON" instruction. Lives next to ReviewOutputSchema
+// so the prompt the agent sees and the schema the runner parses share ONE source and
+// can't drift. The control plane always appends this (it is not user-editable), so a
+// dashboard edit can never break the parser.
+export const REVIEW_OUTPUT_CONTRACT_PROMPT = [
+  `Respond with ONLY a JSON object (no markdown fences, no prose) of this exact shape:`,
+  `{"verdict":"approve|request_changes|comment","summary":"1-3 sentences",`,
+  `"findings":[{"path":"repo/relative/path","line":<integer or null>,"severity":"critical|high|medium|low|info","title":"short","body":"explanation + suggested fix"}],`,
+  `"concerns":["open question or risky assumption", "..."],`,
+  `"suggestedFixes":["prioritized action, reference file:line where possible", "..."]}`,
+  `Map every finding into "findings" with its severity. Put open questions / out-of-scope flags in "concerns"`,
+  `and the highest-leverage actions in "suggestedFixes". Use empty arrays where a section has nothing.`,
+  `Use "approve" only if there are no findings. Use "request_changes" if any finding is high or critical.`,
+].join("\n");
 
 // A prior round's findings, passed back to the runner so the agent can verify
 // resolved/regressed status on a re-review.
@@ -65,6 +90,11 @@ export const LeaseJobSchema = z.object({
   model: z.string().nullable(),
   round: z.number().int(),
   githubToken: z.string().min(1),
+  // The fully-assembled review instruction (persona + strict-template rules + the
+  // active template + JSON contract). Optional for backward-compat: a runner that
+  // predates this field falls back to its local builder. The control plane always
+  // sends it so new runners enforce the template.
+  reviewInstruction: z.string().optional(),
   // Re-review context:
   resumeSessionId: z.string().nullable(),
   priorFindings: z.array(PriorFindingSchema),
@@ -84,6 +114,12 @@ export const JobResultSchema = z.object({
   verdict: z.enum(VERDICTS),
   summary: z.string(),
   findings: z.array(AgentFindingSchema),
+  // Template sections + the model the runner actually used (for the mandatory
+  // "Reviewed by: <model>" line). All optional so an un-upgraded runner's POST
+  // still validates — a required field here would 400 and lose the result.
+  concerns: z.array(z.string()).default([]),
+  suggestedFixes: z.array(z.string()).default([]),
+  modelUsed: z.string().nullable().optional(),
   totalCostUsd: z.number().nonnegative(),
   inputTokens: z.number().int().nonnegative().nullable(),
   outputTokens: z.number().int().nonnegative().nullable(),

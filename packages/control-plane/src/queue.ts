@@ -161,6 +161,8 @@ export async function persistResult(
         round: job.round,
         verdict: result.verdict,
         summary: result.summary,
+        concerns: result.concerns.length ? result.concerns : null,
+        suggestedFixes: result.suggestedFixes.length ? result.suggestedFixes : null,
       })
       .returning({ id: reviews.id });
 
@@ -181,7 +183,7 @@ export async function persistResult(
     await tx.insert(usageEvents).values({
       jobId: job.id,
       runnerId: job.leasedByRunner,
-      model: null,
+      model: result.modelUsed ?? null,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       costUsd: result.totalCostUsd.toFixed(4),

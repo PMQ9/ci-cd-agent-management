@@ -20,6 +20,7 @@ import {
   PR_STATES,
   PROVIDERS,
   SEVERITIES,
+  TEMPLATE_KINDS,
   TRIGGER_SOURCES,
   VERDICTS,
 } from "@agentpr/shared";
@@ -32,6 +33,7 @@ export const verdictEnum = pgEnum("verdict", VERDICTS);
 export const findingStatusEnum = pgEnum("finding_status", FINDING_STATUSES);
 export const severityEnum = pgEnum("severity", SEVERITIES);
 export const prStateEnum = pgEnum("pr_state", PR_STATES);
+export const templateKindEnum = pgEnum("template_kind", TEMPLATE_KINDS);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -149,6 +151,10 @@ export const reviews = pgTable("reviews", {
   githubReviewId: bigint("github_review_id", { mode: "number" }),
   verdict: verdictEnum("verdict").notNull(),
   summary: text("summary").notNull(),
+  // Template sections beyond findings (the pr_review template's Concerns / Suggested
+  // fixes). Stored as JSON string arrays; null/[] when the agent supplied none.
+  concerns: jsonb("concerns").$type<string[]>(),
+  suggestedFixes: jsonb("suggested_fixes").$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -184,7 +190,45 @@ export const usageEvents = pgTable(
   (t) => [index("usage_events_created_idx").on(t.createdAt)],
 );
 
+// Review/contribution templates. Global (single-login model). `pr_review` with
+// is_active=true is the rubric the AI reviewer is forced to fill; a partial unique
+// index guarantees exactly one active pr_review template.
+export const templates = pgTable(
+  "templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    kind: templateKindEnum("kind").notNull(),
+    description: text("description").notNull().default(""),
+    content: text("content").notNull(),
+    isActive: boolean("is_active").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("templates_active_pr_review_idx")
+      .on(t.kind)
+      .where(sql`${t.isActive} and ${t.kind} = 'pr_review'`),
+  ],
+);
+
+// Editable system-prompt pieces for the AI agents. `editable=false` rows (the JSON
+// output contract) are shown read-only in the dashboard and rejected by the PATCH
+// route so the parser can't be broken from the UI.
+export const agentPrompts = pgTable("agent_prompts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  label: text("label").notNull(),
+  description: text("description").notNull().default(""),
+  content: text("content").notNull(),
+  editable: boolean("editable").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type JobRow = typeof jobs.$inferSelect;
 export type RepoRow = typeof repos.$inferSelect;
 export type RunnerRow = typeof runners.$inferSelect;
 export type PullRequestRow = typeof pullRequests.$inferSelect;
+export type TemplateRow = typeof templates.$inferSelect;
+export type AgentPromptRow = typeof agentPrompts.$inferSelect;
