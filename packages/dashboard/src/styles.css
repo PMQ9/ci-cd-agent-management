@@ -345,6 +345,11 @@
   .table-wrap {
     max-width: 100%;
     overflow-x: auto;
+    /* Pin the y-axis: overflow-x:auto alone makes the browser promote the default
+       overflow-y:visible to `auto` (CSS overflow spec), so a sub-pixel-tall table
+       spawns a phantom vertical scrollbar with nothing to scroll. The page owns
+       vertical scroll; this wrapper only ever scrolls horizontally on narrow screens. */
+    overflow-y: hidden;
   }
   table.tbl {
     width: 100%;
