@@ -1,5 +1,5 @@
 # Multi-stage build for the control plane. Build context is the repo root.
-FROM node:22-slim AS base
+FROM node:26-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
