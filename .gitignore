@@ -11,6 +11,9 @@ coverage/
 *.pem
 secrets/
 
+# local security audit reports (enumerate live vulns — never commit)
+security-audit/
+
 # runner working dirs
 .agentpr/
 work/
