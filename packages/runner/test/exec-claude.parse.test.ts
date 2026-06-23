@@ -5,6 +5,7 @@ import {
   extractJsonObject,
   extractModel,
   parseClaudeWrapper,
+  repairInvalidEscapes,
 } from "../src/exec-claude.js";
 
 // A minimal but schema-valid ReviewOutput as a JSON string the agent would emit.
@@ -86,6 +87,47 @@ describe("extractJsonObject", () => {
   it("throws 'no JSON object found' when there is no object", () => {
     expect(() => extractJsonObject("just prose, no braces here")).toThrow("no JSON object found");
   });
+
+  it("recovers JSON whose string values escape backticks (invalid JSON escape)", () => {
+    // The model wrote a code snippet inside `body` and escaped its backticks. Build that
+    // exact mistake: a valid object, then turn every backtick into a backslash-backtick
+    // (which strict JSON.parse rejects with 'Bad escaped character'). We repair + re-parse.
+    const text = JSON.stringify({ title: "t", body: "e.g. `key={inc.id}` works" }).replaceAll(
+      "`",
+      "\\`",
+    );
+    expect(() => JSON.parse(text)).toThrow(); // sanity: the raw text is invalid JSON
+    expect(extractJsonObject(text)).toEqual({ title: "t", body: "e.g. `key={inc.id}` works" });
+  });
+
+  it("preserves valid escapes (backslash, newline) while repairing invalid ones", () => {
+    const text = JSON.stringify({ body: "path C:\\tmp then `code`\nline2" }).replaceAll("`", "\\`");
+    expect(extractJsonObject(text)).toEqual({ body: "path C:\\tmp then `code`\nline2" });
+  });
+});
+
+describe("repairInvalidEscapes", () => {
+  it("drops a stray backslash before a backtick", () => {
+    const input = JSON.stringify("a `b` c").replaceAll("`", "\\`");
+    expect(repairInvalidEscapes(input)).toBe(JSON.stringify("a `b` c"));
+  });
+
+  it("keeps valid JSON escapes intact (backslash, newline, tab, quote, unicode)", () => {
+    // Already-valid JSON with every legal escape — must be returned unchanged.
+    const s = JSON.stringify('\\ \n \t " é');
+    expect(repairInvalidEscapes(s)).toBe(s);
+  });
+
+  it("repairs a backtick-escaped value back to parseable JSON", () => {
+    const bad = JSON.stringify({ x: "a `b` c" }).replaceAll("`", "\\`");
+    expect(() => JSON.parse(bad)).toThrow();
+    expect(JSON.parse(repairInvalidEscapes(bad))).toEqual({ x: "a `b` c" });
+  });
+
+  it("leaves a trailing lone backslash for JSON.parse to reject", () => {
+    const input = '"abc\\';
+    expect(repairInvalidEscapes(input)).toBe(input);
+  });
 });
 
 describe("parseClaudeWrapper", () => {
@@ -108,6 +150,47 @@ describe("parseClaudeWrapper", () => {
     expect(out.totalCostUsd).toBe(0.0421);
     expect(out.inputTokens).toBe(1500);
     expect(out.outputTokens).toBe(320);
+  });
+
+  it("recovers a review whose finding bodies escape backticks (PR #30 regression)", () => {
+    // Reproduces the real failure: the agent emitted valid-looking JSON but escaped the
+    // backticks around code snippets, so strict JSON.parse threw and the whole review was
+    // dumped raw as the summary with empty findings. Build that exact mistake — a valid
+    // ReviewOutput, then turn every backtick into an invalid backslash-backtick.
+    const resultText = JSON.stringify({
+      verdict: "comment",
+      summary: "Two minor issues.",
+      findings: [
+        {
+          path: "packages/dashboard/src/App.tsx",
+          line: 783,
+          severity: "low",
+          title: "Incident list React key uses non-unique name",
+          body: "`<li key={inc.name}>` is not unique within a vendor; prefer a stable `key`.",
+        },
+      ],
+    }).replaceAll("`", "\\`");
+    // Sanity: the agent's raw output is NOT valid JSON on its own.
+    expect(() => JSON.parse(resultText)).toThrow();
+
+    const wrapper = JSON.stringify({
+      result: resultText,
+      session_id: "sess-pr30",
+      total_cost_usd: 0.05,
+      usage: { input_tokens: 2000, output_tokens: 400 },
+      model: "claude-opus-4",
+    });
+    const out = parseClaudeWrapper(wrapper);
+
+    // The review is recovered — NOT the raw-JSON-as-summary fallback.
+    expect(out.review.verdict).toBe("comment");
+    expect(out.review.summary).toBe("Two minor issues.");
+    expect(out.review.findings).toHaveLength(1);
+    expect(out.review.findings[0]!.title).toBe("Incident list React key uses non-unique name");
+    expect(out.review.findings[0]!.body).toContain("`<li key={inc.name}>`");
+    // Summary must be the real summary, never the entire JSON blob.
+    expect(out.review.summary).not.toContain('"verdict"');
+    expect(out.modelUsed).toBe("claude-opus-4");
   });
 
   it("comment fallback when stdout is NOT JSON at all (metadata null/0)", () => {
@@ -168,7 +251,7 @@ describe("parseClaudeWrapper", () => {
   });
 
   it("parses .result wrapped in a ```json fenced block via extractJsonObject", () => {
-    const fencedResult = "```json\n" + validReviewJson + "\n```";
+    const fencedResult = ["```json", validReviewJson, "```"].join("\n");
     const wrapper = JSON.stringify({
       result: fencedResult,
       session_id: "sess-fence",
