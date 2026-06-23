@@ -122,6 +122,7 @@
     position: sticky;
     top: 0;
     height: 100vh;
+    /* biome-ignore lint/suspicious/noDuplicateProperties: intentional progressive-enhancement fallback — vh first, dvh override */
     height: 100dvh; /* dvh avoids the mobile URL-bar clipping the foot; vh is the fallback */
     overflow-y: auto;
   }

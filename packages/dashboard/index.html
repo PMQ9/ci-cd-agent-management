@@ -7,16 +7,16 @@
     <!-- Apply the saved WebTUI theme + UI size before first paint to avoid a flash.
          Keys + defaults mirror src/theme.ts and src/size.ts — keep them in sync. -->
     <script>
-      (function () {
+      (() => {
         var root = document.documentElement;
         try {
           root.setAttribute(
             "data-webtui-theme",
             localStorage.getItem("agentpr.theme") || "catppuccin-mocha",
           );
-          var size = localStorage.getItem("agentpr.size");
-          if (size) root.style.setProperty("--font-size", size + "px");
-        } catch (e) {
+          const size = localStorage.getItem("agentpr.size");
+          if (size) root.style.setProperty("--font-size", `${size}px`);
+        } catch {
           root.setAttribute("data-webtui-theme", "catppuccin-mocha");
         }
       })();

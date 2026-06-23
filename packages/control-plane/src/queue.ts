@@ -1,8 +1,8 @@
+import type { AgentFinding, JobResult, PriorFinding, TriggerSource } from "@agentpr/shared";
 import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import type { AgentFinding, JobResult, PriorFinding, TriggerSource, Verdict } from "@agentpr/shared";
 import { env } from "./config.js";
 import { db } from "./db/client.js";
-import { findings, jobs, reviews, runners, usageEvents, type JobRow } from "./db/schema.js";
+import { findings, type JobRow, jobs, reviews, runners, usageEvents } from "./db/schema.js";
 
 const ACTIVE: ("queued" | "leased" | "running")[] = ["queued", "leased", "running"];
 
