@@ -1,0 +1,298 @@
+name: CI
+
+# Independent checks run as CONCURRENT jobs (no artificial needs-chains) so PR
+# feedback is gated by the slowest single job, not their sum. A final `ci-pass`
+# job aggregates every job into ONE required status check for branch protection.
+#
+# All third-party actions are pinned to a full commit SHA (mutable tags can be
+# moved by a compromised maintainer). Dependabot (.github/dependabot.yml,
+# github-actions ecosystem) keeps these SHAs fresh via reviewable PRs.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege by default; jobs that publish code-scanning results elevate
+# to `security-events: write` locally.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # --------------------------------------------------------------- changes
+  # Path filter so the slow docker-scan only runs when image inputs change.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - id: filter
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - 'tsconfig.base.json'
+              - 'packages/shared/**'
+              - 'packages/control-plane/**'
+              - 'packages/dashboard/**'
+
+  # ------------------------------------------------------------------ lint
+  lint:
+    name: Lint & format (Biome)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Biome CI (lint + format check)
+        run: pnpm lint:ci
+
+  # ------------------------------------------------------------- typecheck
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      # @agentpr/shared exports TS source directly, so no build is needed first.
+      - name: Typecheck all packages
+        run: pnpm -r typecheck
+
+  # ------------------------------------------------------------------ test
+  test:
+    name: Test (full suite + real Postgres)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: agentpr
+          POSTGRES_PASSWORD: agentpr
+          POSTGRES_DB: agentpr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentpr -d agentpr_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Setting TEST_DATABASE_URL flips the harness's realPgAvailable() => true,
+      # so the FOR UPDATE SKIP LOCKED concurrency suite RUNS instead of skipping
+      # (457 passed / 3 skipped on pglite -> 460/460). The harness applies the
+      # committed Drizzle migrations itself, so there's no migrate step here.
+      TEST_DATABASE_URL: postgres://agentpr:agentpr@localhost:5432/agentpr_test
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      # One job runs all 4 vitest projects in parallel in-process
+      # (shared/control-plane/runner = node, dashboard = jsdom + RTL).
+      - name: Run tests with coverage
+        run: pnpm test:cov
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "### Test coverage"
+            echo ""
+            echo "Full HTML/JSON coverage uploaded as the \`coverage\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ----------------------------------------------------------------- build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      # tsup x3 (shared/control-plane/runner) + vite build (dashboard).
+      - name: Build all packages
+        run: pnpm -r build
+
+  # -------------------------------------------------------------- gitleaks
+  # Secret scan over the FULL git history. Runs the gitleaks CLI directly (MIT
+  # licensed) rather than the gitleaks-action wrapper (commercial EULA).
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0 # full history so a secret in ANY commit is caught
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Scan git history for secrets
+        run: gitleaks git . --report-format sarif --report-path gitleaks.sarif --redact --exit-code 1
+      - name: Upload gitleaks SARIF
+        if: always() && hashFiles('gitleaks.sarif') != ''
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  # ---------------------------------------------------------------- codeql
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none # pure TS/JS needs no compilation
+          queries: security-and-quality
+      - name: Analyze
+        uses: github/codeql-action/analyze@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ------------------------------------------------------------- deps-scan
+  # SCA: pnpm audit is the gate (HIGH+ only to cut noise); Trivy fs scan adds a
+  # SARIF view in the Security tab. Both non-blocking initially (continue-on-error
+  # / exit-code 0) — flip to blocking after a triage pass. Complements Dependabot,
+  # which opens upgrade PRs proactively; this stops a known-high CVE landing first.
+  deps-scan:
+    name: Dependency scan (SCA)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: pnpm audit (high+)
+        continue-on-error: true
+        run: pnpm audit --audit-level=high
+      - name: Trivy filesystem scan (deps, SARIF)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          scanners: vuln,secret
+          exit-code: "0"
+        env:
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+      - name: Upload Trivy fs SARIF
+        if: always() && hashFiles('trivy-fs.sarif') != ''
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  # ------------------------------------------------------------ docker-scan
+  # Builds the control-plane image (no push) and Trivy-scans it for CVEs,
+  # secrets-in-layers, and Dockerfile misconfig. Slowest job, so it's path-gated
+  # to image-affecting changes. A broken Dockerfile fails the job; the scan
+  # itself is report-only (SARIF) initially.
+  docker-scan:
+    name: Container scan (Trivy)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+      - name: Build image (no push, load locally)
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: agentpr-control-plane:ci
+      - name: Trivy image scan (vuln + secret + misconfig)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: agentpr-control-plane:ci
+          format: sarif
+          output: trivy-image.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          scanners: vuln,secret,misconfig
+          exit-code: "0"
+        env:
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+      - name: Upload Trivy image SARIF
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+  # --------------------------------------------------------------- ci-pass
+  # Single required status check. Depends on every job and fails if ANY of them
+  # ended in failure/cancelled/timed_out. `skipped` is treated as pass, so a
+  # path-skipped docker-scan does NOT break the gate.
+  ci-pass:
+    name: CI passed
+    if: always()
+    needs: [changes, lint, typecheck, test, build, gitleaks, codeql, deps-scan, docker-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify all required jobs passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: |
+          echo "Upstream job results: $RESULTS"
+          if echo "$RESULTS" | tr ',' '\n' | grep -Eqx 'failure|cancelled|timed_out'; then
+            echo "::error::One or more required CI jobs did not succeed."
+            exit 1
+          fi
+          echo "All required CI jobs succeeded (or were skipped)."

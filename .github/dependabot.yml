@@ -1,0 +1,75 @@
+version: 2
+updates:
+  # ── JS/TS deps (pnpm, lockfile v9) — root + every workspace package ──
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/packages/*"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - javascript
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      # Collapse all non-major bumps across the workspace into one PR.
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      # Keep the React 19 + Vite (dashboard) ecosystem bumps together.
+      react-vite:
+        applies-to: version-updates
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@vitejs/*"
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+    # Majors are intentionally left ungrouped so each lands as its own PR.
+
+  # ── GitHub Actions across all workflows (keeps SHA pins fresh) ──
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # ── Dockerfile base image (node:22-slim) ──
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/Chicago"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
