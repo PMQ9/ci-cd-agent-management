@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  AuthError,
-  api,
   type AgentPromptDTO,
   type AuthConfig,
+  AuthError,
+  api,
   type InstallationsResponse,
   type JobDTO,
   type PullRequestDTO,
@@ -12,9 +12,9 @@ import {
   type TemplateDTO,
   type UsageSummary,
 } from "./api.js";
-import { Badge, JobBadge, Panel } from "./ui.js";
-import { ThemeSwitcher } from "./ThemeSwitcher.js";
 import { SizeSwitcher } from "./SizeSwitcher.js";
+import { ThemeSwitcher } from "./ThemeSwitcher.js";
+import { Badge, JobBadge, Panel } from "./ui.js";
 
 type Tab = "repos" | "templates" | "prompts" | "pulls" | "runners" | "activity" | "usage";
 const TAB_LABELS: Record<Tab, string> = {
@@ -62,6 +62,7 @@ export function App() {
         <nav className="nav">
           {ORDER.map((t) => (
             <button
+              type="button"
               key={t}
               className={tab === t ? "nav-item active" : "nav-item"}
               onClick={() => setTab(t)}
@@ -77,6 +78,7 @@ export function App() {
           <div className="user">
             <span className="dim">@{login}</span>
             <button
+              type="button"
               size-="small"
               variant-="background2"
               onClick={() => api.logout().then(() => location.reload())}
@@ -123,10 +125,13 @@ function LoginScreen() {
             Sign in with GitHub
           </a>
         ) : (
-          <p className="warn">GitHub App not configured — set the GITHUB_* env vars to enable GitHub sign-in.</p>
+          <p className="warn">
+            GitHub App not configured — set the GITHUB_* env vars to enable GitHub sign-in.
+          </p>
         )}
         {cfg?.devLoginAvailable && (
           <button
+            type="button"
             variant-="background2"
             onClick={() => api.devLogin().then(() => location.reload())}
           >
@@ -154,7 +159,7 @@ function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
         else setError(e.message);
       })
       .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `deps` is the caller-supplied dynamic dependency array for this generic useAsync hook
   }, deps);
   useEffect(reload, [reload]);
   return { data, error, loading, reload };
@@ -189,6 +194,7 @@ function ReposPanel() {
               )}
               {inst.installations.map((i) => (
                 <button
+                  type="button"
                   key={i.id}
                   size-="small"
                   variant-="background2"
@@ -282,7 +288,13 @@ function RepoRow({ repo, onChange }: { repo: RepoDTO; onChange: () => void }) {
         </label>
         <div className="review-inline">
           <input placeholder="PR #" value={pr} onChange={(e) => setPr(e.target.value)} />
-          <button className="btn-accent" size-="small" disabled={busy || !pr} onClick={review}>
+          <button
+            type="button"
+            className="btn-accent"
+            size-="small"
+            disabled={busy || !pr}
+            onClick={review}
+          >
             {busy ? "…" : "Review"}
           </button>
         </div>
@@ -305,7 +317,8 @@ function TemplatesPanel() {
       <div className="panel-head">
         <span className="dim">
           Templates the system knows about. The <strong>active PR review</strong> template is the
-          rubric every AI review is forced to fill — edit it here and reviews use it on the next run.
+          rubric every AI review is forced to fill — edit it here and reviews use it on the next
+          run.
         </span>
       </div>
       {!data?.length && <p className="dim">No templates yet.</p>}
@@ -341,7 +354,12 @@ function TemplateCard({ t, onChange }: { t: TemplateDTO; onChange: () => void })
         )}
         <div is-="separator" variant-="foreground2" className="connector" />
         {t.kind === "pr_review" && !t.isActive && (
-          <button size-="small" variant-="background2" onClick={() => patch({ isActive: true })}>
+          <button
+            type="button"
+            size-="small"
+            variant-="background2"
+            onClick={() => patch({ isActive: true })}
+          >
             Set as active rubric
           </button>
         )}
@@ -387,7 +405,13 @@ function PromptsPanel() {
           The system prompt the AI reviewer runs with, in editable pieces. Changes apply to the next
           review. The output contract is fixed so the result parser can’t break.
         </span>
-        <button size-="small" variant-="background2" disabled={previewing} onClick={showPreview}>
+        <button
+          type="button"
+          size-="small"
+          variant-="background2"
+          disabled={previewing}
+          onClick={showPreview}
+        >
           {previewing ? "…" : "Preview assembled instruction"}
         </button>
       </div>
@@ -495,10 +519,16 @@ function PullsPanel() {
       <div className="panel-head">
         <span className="dim">Open PRs across your connected repos.</span>
         <div className="row gap">
-          <button size-="small" variant-="background2" onClick={sync} disabled={syncing}>
+          <button
+            type="button"
+            size-="small"
+            variant-="background2"
+            onClick={sync}
+            disabled={syncing}
+          >
             {syncing ? "Syncing…" : "Sync from GitHub"}
           </button>
-          <button size-="small" variant-="background2" onClick={reload}>
+          <button type="button" size-="small" variant-="background2" onClick={reload}>
             ⟳ Refresh
           </button>
         </div>
@@ -532,7 +562,8 @@ function PullsPanel() {
                 </td>
                 <td>
                   {p.title || <span className="dim">(no title)</span>}{" "}
-                  {p.isDraft && <Badge>draft</Badge>} {!p.autoReviewEnabled && <Badge>manual</Badge>}
+                  {p.isDraft && <Badge>draft</Badge>}{" "}
+                  {!p.autoReviewEnabled && <Badge>manual</Badge>}
                 </td>
                 <td className="dim nowrap">{p.author ?? "—"}</td>
                 <td className="dim nowrap">
@@ -540,6 +571,7 @@ function PullsPanel() {
                 </td>
                 <td className="nowrap">
                   <button
+                    type="button"
                     className="btn-accent"
                     size-="small"
                     disabled={busyId === p.id}
@@ -575,7 +607,7 @@ function RunnersPanel() {
     <>
       <div className="panel-head">
         <span className="dim">Runners run on machines where Claude is logged in.</span>
-        <button size-="small" variant-="background2" onClick={reload}>
+        <button type="button" size-="small" variant-="background2" onClick={reload}>
           ⟳ Refresh
         </button>
       </div>
@@ -609,6 +641,7 @@ function RunnersPanel() {
                 <td className="nowrap">
                   {!r.revokedAt && (
                     <button
+                      type="button"
                       className="btn-danger"
                       size-="small"
                       onClick={() => api.revokeRunner(r.id).then(reload)}
@@ -644,7 +677,7 @@ function ActivityPanel() {
     <>
       <div className="panel-head">
         <span className="dim">Recent review jobs.</span>
-        <button size-="small" variant-="background2" onClick={reload}>
+        <button type="button" size-="small" variant-="background2" onClick={reload}>
           ⟳ Refresh
         </button>
       </div>

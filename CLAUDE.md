@@ -146,6 +146,10 @@ rows are read-only).
 pnpm install
 pnpm -r typecheck          # all packages
 pnpm -r build              # tsup (cp/runner/shared) + vite (dashboard)
+pnpm test                  # full Vitest suite (all 4 projects); pglite — no Docker needed
+pnpm test:watch            # Vitest watch mode
+pnpm test:cov              # with V8 coverage
+npx vitest run --project control-plane queue   # filter: one project + path substring
 pnpm db:up                 # Postgres in Docker
 pnpm db:generate           # regenerate drizzle/*.sql after editing db/schema.ts
 pnpm db:migrate            # apply migrations manually (also auto-runs on control-plane boot)
@@ -157,6 +161,44 @@ pnpm preview:web           # local prod-preview: build dashboard + control plane
 
 After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
 `packages/control-plane/drizzle/*.sql`.
+
+## Testing (MANDATORY — hard requirement)
+
+**Every new feature or behavior change MUST ship with comprehensive tests in the same
+change.** This is non-negotiable, not a follow-up. A PR that adds/changes behavior without
+tests is incomplete. Concretely:
+
+- New API route → route test (`app.inject`) covering the auth guard, the happy path,
+  input-validation 400, and the error/404 paths.
+- New/changed queue or persistence logic → a DB-backed integration test (state transitions,
+  idempotency, transactionality, boundaries).
+- New Zod contract / enum → round-trip parse + rejection of invalid input in
+  `packages/shared/test`.
+- New runner behavior → unit test; anything touching the `ANTHROPIC_API_KEY` refusal must
+  keep that negative test passing.
+- Bug fix → a regression test that fails before the fix and passes after.
+- Run `pnpm test` (and `pnpm -r typecheck`) green before committing.
+
+**Stack:** Vitest, one project per package (root `vitest.config.ts`, `test.projects`). Node env
+for shared/control-plane/runner; jsdom + React Testing Library for dashboard. Tests live in
+each package's `test/`.
+
+- **DB tests run on pglite by default** (in-memory Postgres — no Docker), applying the SAME
+  committed migrations the app ships. Each test file gets its own isolated instance, so files
+  truncate freely in parallel. Harness: `packages/control-plane/test/harness/`
+  (`db.ts`, `setup-db.ts`, `factories.ts`, `http.ts`). The `db/client.js` singleton is swapped
+  via `vi.mock` + a hoisted holder + `installDbLifecycle(holder)`; GitHub (`github/app.js`) is
+  mocked so no Octokit/network.
+- **The SKIP LOCKED concurrency suite needs a real Postgres** (pglite is single-connection).
+  It is opt-in **per file** via `createTestDb({ forceRealPg: true })` and gated on
+  `TEST_DATABASE_URL`; it auto-skips otherwise. Do NOT make other DB suites depend on real PG —
+  `forceRealPg` is the only switch (a shared real DB can't be truncated safely across parallel
+  files). To run it: `pnpm db:up`, create `agentpr_test`, then
+  `TEST_DATABASE_URL=postgres://agentpr:agentpr@localhost:5432/agentpr_test pnpm test`.
+- **Testability via additive exports:** prefer adding an `export` (e.g. `renderTemplateBody`,
+  the `exec-claude.ts` pure helpers, `handleJob`) over restructuring. `runner/main.ts` only
+  starts its poll loop when it is the process entrypoint (`isEntrypoint()` guard), so the module
+  is import-safe in tests — keep that guard.
 
 ## Gotchas (these caused real design decisions)
 
@@ -214,10 +256,13 @@ After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new
 
 ## Verification
 
-Local: `pnpm -r typecheck && pnpm -r build`, `pnpm db:up`, boot the control plane, then
-the smoke checks (enroll runner, dev-login, list endpoints). End-to-end (needs the GitHub
-App + a real PR, consumes quota): see `deploy/gcp/SETUP.md` §7. The negative check that
-matters: a runner with `ANTHROPIC_API_KEY` set must REFUSE to run.
+Local: `pnpm test` (full Vitest suite — pglite, no Docker) **and**
+`pnpm -r typecheck && pnpm -r build`. For the SKIP LOCKED concurrency suite, additionally run
+with a real Postgres (see Testing above). Then `pnpm db:up`, boot the control plane, and the
+smoke checks (enroll runner, dev-login, list endpoints). End-to-end (needs the GitHub App + a
+real PR, consumes quota): see `deploy/gcp/SETUP.md` §7. The negative check that matters: a
+runner with `ANTHROPIC_API_KEY` set must REFUSE to run (pinned by
+`packages/runner/test/exec-claude.guard.test.ts`).
 
 ## Deploy (topology)
 

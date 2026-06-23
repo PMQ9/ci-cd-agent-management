@@ -1,5 +1,5 @@
-import { App } from "@octokit/app";
 import type { AgentFinding, Severity, Verdict } from "@agentpr/shared";
+import { App } from "@octokit/app";
 import { env, githubConfigured, loadPrivateKey } from "../config.js";
 
 let _app: App | null = null;
@@ -73,7 +73,7 @@ function renderFindingLine(f: AgentFinding): string {
  * mandatory "Reviewed by: <model>" line (stamped by the control plane, never the agent).
  * Empty sections render "None." so the posted review always matches the template shape.
  */
-function renderTemplateBody(opts: {
+export function renderTemplateBody(opts: {
   verdict: Verdict;
   summary: string;
   findings: AgentFinding[];
@@ -82,7 +82,11 @@ function renderTemplateBody(opts: {
   modelName: string;
   round: number;
 }): string {
-  const buckets = { high: [] as AgentFinding[], medium: [] as AgentFinding[], low: [] as AgentFinding[] };
+  const buckets = {
+    high: [] as AgentFinding[],
+    medium: [] as AgentFinding[],
+    low: [] as AgentFinding[],
+  };
   for (const f of opts.findings) buckets[SEVERITY_BUCKET[f.severity]].push(f);
 
   const section = (items: AgentFinding[]) =>
@@ -237,10 +241,11 @@ export async function getPrRefs(
   prNumber: number,
 ): Promise<{ headSha: string; baseSha: string; cloneUrl: string; draft: boolean }> {
   const octokit = await getApp().getInstallationOctokit(installationId);
-  const { data } = await octokit.request(
-    "GET /repos/{owner}/{repo}/pulls/{pull_number}",
-    { owner, repo, pull_number: prNumber },
-  );
+  const { data } = await octokit.request("GET /repos/{owner}/{repo}/pulls/{pull_number}", {
+    owner,
+    repo,
+    pull_number: prNumber,
+  });
   return {
     headSha: data.head.sha,
     baseSha: data.base.sha,

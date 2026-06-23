@@ -19,12 +19,7 @@ export type JobState = (typeof JOB_STATES)[number];
 /** States that still occupy a runner / queue slot. */
 export const ACTIVE_JOB_STATES = ["queued", "leased", "running"] as const;
 /** Terminal states. */
-export const TERMINAL_JOB_STATES = [
-  "succeeded",
-  "failed",
-  "cancelled",
-  "superseded",
-] as const;
+export const TERMINAL_JOB_STATES = ["succeeded", "failed", "cancelled", "superseded"] as const;
 
 export const PROVIDERS = ["claude_code", "opencode"] as const;
 export type Provider = (typeof PROVIDERS)[number];

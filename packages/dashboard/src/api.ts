@@ -123,7 +123,10 @@ export const api = {
 
   installations: () => req<InstallationsResponse>("/api/installations"),
   syncInstallation: (id: number) =>
-    req<{ ok: boolean; synced: number }>(`/api/installations/${id}/sync`, { method: "POST", body: "{}" }),
+    req<{ ok: boolean; synced: number }>(`/api/installations/${id}/sync`, {
+      method: "POST",
+      body: "{}",
+    }),
 
   runners: () => req<RunnerDTO[]>("/api/runners"),
   revokeRunner: (id: string) =>
@@ -140,7 +143,10 @@ export const api = {
     }),
 
   templates: () => req<TemplateDTO[]>("/api/templates"),
-  updateTemplate: (id: string, patch: Partial<Pick<TemplateDTO, "content" | "description" | "isActive">>) =>
+  updateTemplate: (
+    id: string,
+    patch: Partial<Pick<TemplateDTO, "content" | "description" | "isActive">>,
+  ) =>
     req<{ ok: boolean }>(`/api/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 
   prompts: () => req<AgentPromptDTO[]>("/api/prompts"),

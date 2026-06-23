@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { THEME_GROUPS, applyTheme, getStoredTheme } from "./theme.js";
+import { applyTheme, getStoredTheme, THEME_GROUPS } from "./theme.js";
 
 export function ThemeSwitcher() {
   // Initialised from localStorage, which the pre-paint script already applied to

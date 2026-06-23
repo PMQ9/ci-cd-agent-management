@@ -1,4 +1,16 @@
 import {
+  FINDING_STATUSES,
+  JOB_STATES,
+  PR_STATES,
+  PROVIDERS,
+  SEVERITIES,
+  TEMPLATE_KINDS,
+  TRIGGER_SOURCES,
+  VERDICTS,
+} from "@agentpr/shared";
+import { sql } from "drizzle-orm";
+import {
+  type AnyPgColumn,
   bigint,
   boolean,
   index,
@@ -11,19 +23,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
-import {
-  FINDING_STATUSES,
-  JOB_STATES,
-  PR_STATES,
-  PROVIDERS,
-  SEVERITIES,
-  TEMPLATE_KINDS,
-  TRIGGER_SOURCES,
-  VERDICTS,
-} from "@agentpr/shared";
 
 // Enum values come from @agentpr/shared so the DB and the Zod layer can never drift.
 export const jobStateEnum = pgEnum("job_state", JOB_STATES);
@@ -99,9 +99,7 @@ export const runners = pgTable("runners", {
   name: text("name").notNull(),
   // sha256 of the durable runner token; the plaintext lives only on the runner.
   tokenHash: text("token_hash").notNull(),
-  capabilities: jsonb("capabilities")
-    .$type<{ providers: string[]; version?: string }>()
-    .notNull(),
+  capabilities: jsonb("capabilities").$type<{ providers: string[]; version?: string }>().notNull(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

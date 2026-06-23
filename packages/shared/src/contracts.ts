@@ -7,7 +7,12 @@ import { PROVIDERS, SEVERITIES, VERDICTS } from "./enums";
 
 export const AgentFindingSchema = z.object({
   path: z.string().describe("repo-relative file path"),
-  line: z.number().int().positive().nullable().describe("line in the new file, or null for file-level"),
+  line: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .describe("line in the new file, or null for file-level"),
   severity: z.enum(SEVERITIES),
   title: z.string().min(1),
   body: z.string().min(1).describe("explanation + suggested fix, markdown"),

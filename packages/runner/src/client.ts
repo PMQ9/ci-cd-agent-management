@@ -1,11 +1,11 @@
 import {
-  EnrollResponseSchema,
-  LeaseResponseSchema,
   type EnrollRequest,
   type EnrollResponse,
+  EnrollResponseSchema,
   type JobError,
   type JobResult,
   type LeaseResponse,
+  LeaseResponseSchema,
 } from "@agentpr/shared";
 import { env } from "./config.js";
 

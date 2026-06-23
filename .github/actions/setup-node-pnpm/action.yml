@@ -1,0 +1,37 @@
+name: "Setup Node + pnpm"
+description: "Install pnpm (from packageManager), set up Node 22 with pnpm-store cache, and run a frozen-lockfile install."
+
+# Shared by the lint / typecheck / test / build / deps-scan jobs so the
+# Node+pnpm+install dance lives in one place. NOTE: this is a composite action,
+# so the caller must `actions/checkout` first (package.json must be on disk for
+# pnpm/action-setup to read `packageManager`).
+
+inputs:
+  install:
+    description: "Run `pnpm install --frozen-lockfile`. Set to 'false' to skip (rarely needed)."
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # pnpm MUST be installed before setup-node so `cache: pnpm` can find the
+    # store and compute the lockfile-keyed cache. Version is read from the
+    # repo's `packageManager` field (pnpm@11.6.0) — no second place to drift.
+    - name: Install pnpm
+      uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      with:
+        run_install: false
+
+    - name: Set up Node
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: 22 # matches the Dockerfile (node:22-slim); engines >=20
+        cache: pnpm
+
+    # esbuild's postinstall is pre-approved via pnpm-workspace.yaml `allowBuilds`,
+    # so a frozen-lockfile install doesn't trip the supply-chain build gate.
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile

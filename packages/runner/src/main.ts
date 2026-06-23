@@ -1,6 +1,7 @@
 import { hostname } from "node:os";
+import { fileURLToPath } from "node:url";
 import type { LeaseJob } from "@agentpr/shared";
-import { prepareCheckout, type Checkout } from "./checkout.js";
+import { type Checkout, prepareCheckout } from "./checkout.js";
 import { ControlPlaneClient } from "./client.js";
 import { env } from "./config.js";
 import { loadCreds, saveCreds } from "./creds.js";
@@ -10,7 +11,7 @@ function log(...args: unknown[]): void {
   console.log(new Date().toISOString(), "[runner]", ...args);
 }
 
-async function ensureEnrolled(client: ControlPlaneClient): Promise<void> {
+export async function ensureEnrolled(client: ControlPlaneClient): Promise<void> {
   const existing = await loadCreds(env.RUNNER_CRED_FILE);
   if (existing) {
     client.setToken(existing.runnerToken);
@@ -32,7 +33,7 @@ async function ensureEnrolled(client: ControlPlaneClient): Promise<void> {
   log(`enrolled as ${res.runnerId}`);
 }
 
-async function handleJob(client: ControlPlaneClient, job: LeaseJob): Promise<void> {
+export async function handleJob(client: ControlPlaneClient, job: LeaseJob): Promise<void> {
   const started = Date.now();
   log(`leased ${job.jobId} — ${job.repoFullName}#${job.prNumber} (round ${job.round})`);
   let checkout: Checkout | undefined;
@@ -84,7 +85,12 @@ async function handleJob(client: ControlPlaneClient, job: LeaseJob): Promise<voi
     const message = err instanceof Error ? err.message : String(err);
     log(`FAILED ${job.jobId}: ${message}`);
     try {
-      await client.reportError({ leaseId: job.leaseId, message, totalCostUsd: null, wallMs: Date.now() - started });
+      await client.reportError({
+        leaseId: job.leaseId,
+        message,
+        totalCostUsd: null,
+        wallMs: Date.now() - started,
+      });
     } catch (reportErr) {
       log(`could not report error for ${job.jobId}:`, reportErr);
     }
@@ -93,7 +99,7 @@ async function handleJob(client: ControlPlaneClient, job: LeaseJob): Promise<voi
   }
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   if (process.env.ANTHROPIC_API_KEY) {
     log(
       "WARNING: ANTHROPIC_API_KEY is set. Reviews will be REFUSED to protect your subscription billing — unset it in this environment.",
@@ -133,7 +139,22 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error("[runner] fatal:", err);
-  process.exit(1);
-});
+// Start the poll loop only when this module is the process entrypoint (i.e.
+// `node dist/main.js` / `tsx src/main.ts`). Guarding this keeps the module safe to
+// import from tests without kicking off the infinite poll loop or calling process.exit.
+function isEntrypoint(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return fileURLToPath(import.meta.url) === entry;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntrypoint()) {
+  main().catch((err) => {
+    console.error("[runner] fatal:", err);
+    process.exit(1);
+  });
+}

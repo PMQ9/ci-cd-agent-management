@@ -1,7 +1,8 @@
 import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
-import { env, isProd } from "./config.js";
 import { registerAuth } from "./auth.js";
+import { env, isProd } from "./config.js";
 import { sweepExpiredLeases } from "./queue.js";
 import { registerJobRoutes } from "./routes/jobs.js";
 import { registerPromptRoutes } from "./routes/prompts.js";
@@ -35,6 +36,12 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   await app.register(cookie, { secret: env.SESSION_SECRET });
 
+  // Rate limiting is opt-in per route (global: false) so the runner's lease
+  // short-poll and the dashboard API stay unthrottled. The public `/webhook`
+  // endpoint opts in (see registerWebhook) to blunt floods of unauthenticated
+  // (bad-HMAC) requests before they reach the signature check.
+  await app.register(rateLimit, { global: false });
+
   app.get("/health", async () => ({ ok: true }));
   app.get("/readyz", async () => ({ ok: true }));
 
@@ -49,7 +56,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     const auth = request.headers.authorization;
     const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
     if (!token || !safeEqualHex(token, env.INTERNAL_API_TOKEN)) {
-      return reply.code(401).send({ error: { code: "unauthenticated", message: "Bad internal token" } });
+      return reply
+        .code(401)
+        .send({ error: { code: "unauthenticated", message: "Bad internal token" } });
     }
     const requeued = await sweepExpiredLeases();
     if (requeued) request.log.info({ requeued }, "swept expired leases (http)");

@@ -1,5 +1,5 @@
+import { type PriorFinding, REVIEW_OUTPUT_CONTRACT_PROMPT } from "@agentpr/shared";
 import { and, eq } from "drizzle-orm";
-import { REVIEW_OUTPUT_CONTRACT_PROMPT, type PriorFinding } from "@agentpr/shared";
 import { db } from "./db/client.js";
 import { agentPrompts, templates } from "./db/schema.js";
 import { SEED_PROMPTS, SEED_TEMPLATES } from "./seed-data.js";

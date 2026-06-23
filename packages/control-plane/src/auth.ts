@@ -47,11 +47,11 @@ export function registerAuth(app: FastifyInstance): void {
     devLoginAvailable: !isProd,
   }));
 
-  app.get("/auth/login", async (request, reply) => {
+  app.get("/auth/login", async (_request, reply) => {
     if (!githubConfigured) {
-      return reply
-        .code(503)
-        .send({ error: { code: "github_not_configured", message: "Configure the GitHub App first" } });
+      return reply.code(503).send({
+        error: { code: "github_not_configured", message: "Configure the GitHub App first" },
+      });
     }
     const state = randomToken(16);
     reply.setCookie(STATE_COOKIE, state, {
@@ -74,9 +74,13 @@ export function registerAuth(app: FastifyInstance): void {
     async (request, reply) => {
       const { code, state } = request.query;
       const stateCookie = request.cookies?.[STATE_COOKIE];
-      const unsigned = stateCookie ? request.unsignCookie(stateCookie) : { valid: false, value: null };
+      const unsigned = stateCookie
+        ? request.unsignCookie(stateCookie)
+        : { valid: false, value: null };
       if (!code || !state || !unsigned.valid || unsigned.value !== state) {
-        return reply.code(400).send({ error: { code: "bad_oauth_state", message: "Invalid OAuth state" } });
+        return reply
+          .code(400)
+          .send({ error: { code: "bad_oauth_state", message: "Invalid OAuth state" } });
       }
       reply.clearCookie(STATE_COOKIE, { path: "/" });
 
@@ -85,9 +89,9 @@ export function registerAuth(app: FastifyInstance): void {
       const { data: user } = await octokit.request("GET /user");
 
       if (env.ALLOWED_GITHUB_LOGIN && user.login !== env.ALLOWED_GITHUB_LOGIN) {
-        return reply
-          .code(403)
-          .send({ error: { code: "forbidden", message: `${user.login} is not allowed to sign in` } });
+        return reply.code(403).send({
+          error: { code: "forbidden", message: `${user.login} is not allowed to sign in` },
+        });
       }
       setSession(reply, user.login);
       return reply.redirect("/");

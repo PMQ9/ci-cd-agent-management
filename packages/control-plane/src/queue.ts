@@ -1,8 +1,8 @@
+import type { AgentFinding, JobResult, PriorFinding, TriggerSource } from "@agentpr/shared";
 import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import type { AgentFinding, JobResult, PriorFinding, TriggerSource, Verdict } from "@agentpr/shared";
 import { env } from "./config.js";
 import { db } from "./db/client.js";
-import { findings, jobs, reviews, runners, usageEvents, type JobRow } from "./db/schema.js";
+import { findings, type JobRow, jobs, reviews, runners, usageEvents } from "./db/schema.js";
 
 const ACTIVE: ("queued" | "leased" | "running")[] = ["queued", "leased", "running"];
 
@@ -213,6 +213,9 @@ export async function recordError(
   costUsd: number | null,
   wallMs: number | null,
 ): Promise<void> {
+  // Idempotent like persistResult: a retried error report for an already-terminal
+  // job is a no-op, so a duplicate POST can't double-charge a usage event.
+  if (job.state !== "leased" && job.state !== "running") return;
   await db.transaction(async (tx) => {
     if (costUsd && costUsd > 0) {
       await tx.insert(usageEvents).values({

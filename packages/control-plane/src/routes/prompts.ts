@@ -1,7 +1,7 @@
+import { REVIEW_OUTPUT_CONTRACT_PROMPT } from "@agentpr/shared";
 import { asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { REVIEW_OUTPUT_CONTRACT_PROMPT } from "@agentpr/shared";
 import { requireUser } from "../auth.js";
 import { db } from "../db/client.js";
 import { agentPrompts } from "../db/schema.js";
@@ -45,10 +45,17 @@ export function registerPromptRoutes(app: FastifyInstance): void {
       if (!parsed.success) {
         return reply.code(400).send({ error: { code: "bad_request", message: "Invalid update" } });
       }
-      const [row] = await db.select().from(agentPrompts).where(eq(agentPrompts.key, request.params.key)).limit(1);
-      if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Prompt not found" } });
+      const [row] = await db
+        .select()
+        .from(agentPrompts)
+        .where(eq(agentPrompts.key, request.params.key))
+        .limit(1);
+      if (!row)
+        return reply.code(404).send({ error: { code: "not_found", message: "Prompt not found" } });
       if (!row.editable) {
-        return reply.code(400).send({ error: { code: "read_only", message: "This prompt is not editable" } });
+        return reply
+          .code(400)
+          .send({ error: { code: "read_only", message: "This prompt is not editable" } });
       }
       await db
         .update(agentPrompts)

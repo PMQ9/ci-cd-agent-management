@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SIZE_OPTIONS, applySize, getStoredSize } from "./size.js";
+import { applySize, getStoredSize, SIZE_OPTIONS } from "./size.js";
 
 export function SizeSwitcher() {
   // Initialised from localStorage, which the pre-paint script already applied to

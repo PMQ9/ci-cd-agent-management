@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { installations, repos, type RepoRow } from "../db/schema.js";
+import { installations, type RepoRow, repos } from "../db/schema.js";
 import { getApp } from "./app.js";
 
 export async function upsertInstallation(input: {
