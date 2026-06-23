@@ -72,6 +72,27 @@ importers:
 
   packages/dashboard:
     dependencies:
+      '@fontsource-variable/jetbrains-mono':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@webtui/css':
+        specifier: ^0.1.9
+        version: 0.1.9
+      '@webtui/theme-catppuccin':
+        specifier: ^0.0.5
+        version: 0.0.5
+      '@webtui/theme-everforest':
+        specifier: ^0.0.5
+        version: 0.0.5
+      '@webtui/theme-gruvbox':
+        specifier: ^0.0.3
+        version: 0.0.3
+      '@webtui/theme-nord':
+        specifier: ^0.0.4
+        version: 0.0.4
+      '@webtui/theme-vitesse':
+        specifier: ^0.0.3
+        version: 0.0.3
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -997,6 +1018,9 @@ packages:
   '@fastify/static@8.3.0':
     resolution: {integrity: sha512-yKxviR5PH1OKNnisIzZKmgZSus0r2OZb8qCSbqmw34aolT4g3UlzYfeBRym+HJ1J471CR8e2ldNub4PubD1coA==}
 
+  '@fontsource-variable/jetbrains-mono@5.2.8':
+    resolution: {integrity: sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q==}
+
   '@isaacs/cliui@9.0.0':
     resolution: {integrity: sha512-AokJm4tuBHillT+FpMtxQ60n8ObyXBatq7jD2/JA9dxbDDokKQm8KMht5ibGzLVU9IJDIKK4TPKgMHEYMn3lMg==}
     engines: {node: '>=18'}
@@ -1288,6 +1312,24 @@ packages:
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
+
+  '@webtui/css@0.1.9':
+    resolution: {integrity: sha512-frEwcxRihw3VlmUxLzu5gsvp2KaPtETJvKKgCFHq+9KJ/kqZrgGoil9W56SOgW3T6/9CMtRG8fciU4yixGwPOg==}
+
+  '@webtui/theme-catppuccin@0.0.5':
+    resolution: {integrity: sha512-Lpq6vC1pcvaszLynCpoSd96GpyzumdLGeB7eFaxBRbIbgV4YjiICZuwzi4wsT4FlWrpsefaBg5jN3UHs+wLU2Q==}
+
+  '@webtui/theme-everforest@0.0.5':
+    resolution: {integrity: sha512-hRMTMqSc+pLa1l1uYK22hAfkidNBfiTDwcJ7X/nULyArsp/F2CjXjBG0118re5rS8HZTVF9F6TkpHsqVpisw2Q==}
+
+  '@webtui/theme-gruvbox@0.0.3':
+    resolution: {integrity: sha512-b2Iep/Vg1a/L3VNS4GwSuSdZ/Nn051bnWuHZZTX1ULwz7KBFeyyIDaHqu0vUdiCdVORj/WWdgHLkOyiJ5wEzCA==}
+
+  '@webtui/theme-nord@0.0.4':
+    resolution: {integrity: sha512-4nFRz38hsbPGv4A6mPBz4jbbNJhleEXsJS39F6yxBzVHbYHZHQDcB7fI8vbN95lubWbN6k6mya+lf014LmRorQ==}
+
+  '@webtui/theme-vitesse@0.0.3':
+    resolution: {integrity: sha512-PfxWjDuVzO2GwxaoCaUeg9K4FHWA1PBdWdkiplUeOm/Ra0Rf4WCx5fbC2nlon+GzXC1N1BxdA09peBaluJftlA==}
 
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
@@ -2692,6 +2734,8 @@ snapshots:
       fastq: 1.20.1
       glob: 11.1.0
 
+  '@fontsource-variable/jetbrains-mono@5.2.8': {}
+
   '@isaacs/cliui@9.0.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
@@ -2975,6 +3019,18 @@ snapshots:
       vite: 6.4.3(@types/node@22.20.0)(tsx@4.22.4)
     transitivePeerDependencies:
       - supports-color
+
+  '@webtui/css@0.1.9': {}
+
+  '@webtui/theme-catppuccin@0.0.5': {}
+
+  '@webtui/theme-everforest@0.0.5': {}
+
+  '@webtui/theme-gruvbox@0.0.3': {}
+
+  '@webtui/theme-nord@0.0.4': {}
+
+  '@webtui/theme-vitesse@0.0.3': {}
 
   abstract-logging@2.0.1: {}
 

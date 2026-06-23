@@ -9,15 +9,25 @@ import {
   type RunnerDTO,
   type UsageSummary,
 } from "./api.js";
+import { Badge, JobBadge, Panel } from "./ui.js";
+import { ThemeSwitcher } from "./ThemeSwitcher.js";
 
 type Tab = "repos" | "pulls" | "runners" | "activity" | "usage";
 const TAB_LABELS: Record<Tab, string> = {
-  repos: "Repos",
+  repos: "Repositories",
   pulls: "Pull Requests",
   runners: "Runners",
   activity: "Activity",
-  usage: "Usage",
+  usage: "Usage & spend",
 };
+const NAV_GLYPH: Record<Tab, string> = {
+  repos: "▤",
+  pulls: "⇄",
+  runners: "◇",
+  activity: "◷",
+  usage: "$",
+};
+const ORDER: Tab[] = ["repos", "pulls", "runners", "activity", "usage"];
 
 export function App() {
   const [login, setLogin] = useState<string | null>(null);
@@ -32,35 +42,49 @@ export function App() {
       .finally(() => setAuthChecked(true));
   }, []);
 
-  if (!authChecked) return <div className="center muted">Loading…</div>;
+  if (!authChecked) return <div className="center dim">Loading…</div>;
   if (!login) return <LoginScreen />;
 
   return (
-    <div className="app">
-      <header className="topbar">
+    <div className="layout">
+      <aside className="sidebar">
         <div className="brand">
-          <span className="logo">◆</span> Agent PR <span className="muted">Control Center</span>
+          <span className="logo">◆</span>Agent PR <span className="dim">Control Center</span>
         </div>
-        <nav className="tabs">
-          {(["repos", "pulls", "runners", "activity", "usage"] as Tab[]).map((t) => (
-            <button key={t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>
-              {TAB_LABELS[t]}
+        <nav className="nav">
+          {ORDER.map((t) => (
+            <button
+              key={t}
+              className={tab === t ? "nav-item active" : "nav-item"}
+              onClick={() => setTab(t)}
+            >
+              <span className="nav-glyph">{NAV_GLYPH[t]}</span>
+              <span>{TAB_LABELS[t]}</span>
             </button>
           ))}
         </nav>
-        <div className="user">
-          <span className="muted">@{login}</span>
-          <button className="link" onClick={() => api.logout().then(() => location.reload())}>
-            sign out
-          </button>
+        <div className="sidebar-foot">
+          <ThemeSwitcher />
+          <div className="user">
+            <span className="dim">@{login}</span>
+            <button
+              size-="small"
+              variant-="background2"
+              onClick={() => api.logout().then(() => location.reload())}
+            >
+              sign out
+            </button>
+          </div>
         </div>
-      </header>
+      </aside>
       <main className="content">
-        {tab === "repos" && <ReposPanel />}
-        {tab === "pulls" && <PullsPanel />}
-        {tab === "runners" && <RunnersPanel />}
-        {tab === "activity" && <ActivityPanel />}
-        {tab === "usage" && <UsagePanel />}
+        <Panel title={TAB_LABELS[tab]}>
+          {tab === "repos" && <ReposPanel />}
+          {tab === "pulls" && <PullsPanel />}
+          {tab === "runners" && <RunnersPanel />}
+          {tab === "activity" && <ActivityPanel />}
+          {tab === "usage" && <UsagePanel />}
+        </Panel>
       </main>
     </div>
   );
@@ -70,16 +94,19 @@ function LoginScreen() {
   const dev = import.meta.env.DEV;
   return (
     <div className="center">
-      <div className="card login">
+      <div className="login" box-="double">
         <div className="brand big">
-          <span className="logo">◆</span> Agent PR Control Center
+          <span className="logo">◆</span>Agent PR Control Center
         </div>
-        <p className="muted">Sign in to manage your repos, runners, and reviews.</p>
-        <a className="btn primary" href="/auth/login">
+        <p className="dim">Sign in to manage your repos, runners, and reviews.</p>
+        <a is-="button" className="btn-accent" href="/auth/login">
           Sign in with GitHub
         </a>
         {dev && (
-          <button className="btn ghost" onClick={() => api.devLogin().then(() => location.reload())}>
+          <button
+            variant-="background2"
+            onClick={() => api.devLogin().then(() => location.reload())}
+          >
             Dev login (local only)
           </button>
         )}
@@ -112,32 +139,41 @@ function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
 
 function ReposPanel() {
   const { data: repos, reload } = useAsync<RepoDTO[]>(() => api.repos(), []);
-  const { data: inst, reload: reloadInst } = useAsync<InstallationsResponse>(
-    () => api.installations(),
-    [],
-  );
+  const { data: inst } = useAsync<InstallationsResponse>(() => api.installations(), []);
 
   return (
-    <section>
-      <div className="row between">
-        <h2>Repositories</h2>
-        <button className="btn ghost" onClick={reload}>
+    <>
+      <div className="panel-head">
+        <span className="dim">Repositories connected to the GitHub App.</span>
+        <button size-="small" variant-="background2" onClick={reload}>
           ⟳ Refresh
         </button>
       </div>
 
-      <div className="card subtle connect">
+      <div className="connect" box-="square">
         {inst?.githubConfigured ? (
           <>
             <span>Connect or disconnect repos on GitHub, then sync.</span>
             <div className="row gap">
               {inst.installUrl && (
-                <a className="btn small" href={inst.installUrl} target="_blank" rel="noreferrer">
+                <a
+                  is-="button"
+                  size-="small"
+                  variant-="background2"
+                  href={inst.installUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Manage on GitHub ↗
                 </a>
               )}
               {inst.installations.map((i) => (
-                <button key={i.id} className="btn small ghost" onClick={() => api.syncInstallation(i.id).then(reload)}>
+                <button
+                  key={i.id}
+                  size-="small"
+                  variant-="background2"
+                  onClick={() => api.syncInstallation(i.id).then(reload)}
+                >
                   Sync {i.accountLogin}
                 </button>
               ))}
@@ -148,14 +184,13 @@ function ReposPanel() {
         )}
       </div>
 
-      {!repos?.length && <p className="muted">No repositories connected yet.</p>}
-      <div className="list">
+      {!repos?.length && <p className="dim">No repositories connected yet.</p>}
+      <div>
         {repos?.map((r) => (
           <RepoRow key={r.id} repo={r} onChange={reload} />
         ))}
       </div>
-      <button className="link" onClick={reloadInst} hidden />
-    </section>
+    </>
   );
 }
 
@@ -182,25 +217,30 @@ function RepoRow({ repo, onChange }: { repo: RepoDTO; onChange: () => void }) {
   };
 
   return (
-    <div className="card repo">
+    <div className="repo" box-="round">
       <div className="repo-head">
-        <div>
-          <span className="repo-name">{repo.fullName}</span>
-          {repo.isPrivate && <span className="badge">private</span>}
-          <span className="badge subtle">{repo.provider}</span>
-        </div>
-        <label className="toggle">
+        <span className="repo-name">{repo.fullName}</span>
+        {repo.isPrivate && (
+          <Badge tone="peach" cap="round">
+            private
+          </Badge>
+        )}
+        <Badge tone="mauve" cap="round">
+          {repo.provider}
+        </Badge>
+        <div is-="separator" variant-="foreground2" className="connector" />
+        <label className="switch-row">
           <input
             type="checkbox"
+            is-="switch"
             checked={repo.autoReviewEnabled}
             onChange={(e) => patch({ autoReviewEnabled: e.target.checked })}
           />
-          <span className="slider" />
-          <span className="toggle-label">{repo.autoReviewEnabled ? "Auto review" : "Manual"}</span>
+          {repo.autoReviewEnabled ? "auto review" : "manual"}
         </label>
       </div>
       <div className="repo-controls">
-        <label>
+        <label className="field">
           Model
           <input
             placeholder="(default)"
@@ -208,24 +248,26 @@ function RepoRow({ repo, onChange }: { repo: RepoDTO; onChange: () => void }) {
             onBlur={(e) => patch({ model: e.target.value || null })}
           />
         </label>
-        <label>
+        <label className="field">
           Daily cap $
           <input
             type="number"
             step="0.5"
             placeholder="none"
             defaultValue={repo.dailyCostCapUsd ?? ""}
-            onBlur={(e) => patch({ dailyCostCapUsd: e.target.value ? Number(e.target.value) : null })}
+            onBlur={(e) =>
+              patch({ dailyCostCapUsd: e.target.value ? Number(e.target.value) : null })
+            }
           />
         </label>
         <div className="review-inline">
           <input placeholder="PR #" value={pr} onChange={(e) => setPr(e.target.value)} />
-          <button className="btn small primary" disabled={busy || !pr} onClick={review}>
+          <button className="btn-accent" size-="small" disabled={busy || !pr} onClick={review}>
             {busy ? "…" : "Review"}
           </button>
         </div>
       </div>
-      {msg && <div className="repo-msg muted">{msg}</div>}
+      {msg && <div className="repo-msg">{msg}</div>}
     </div>
   );
 }
@@ -274,25 +316,25 @@ function PullsPanel() {
   };
 
   return (
-    <section>
-      <div className="row between">
-        <h2>Pull Requests</h2>
+    <>
+      <div className="panel-head">
+        <span className="dim">Open PRs across your connected repos.</span>
         <div className="row gap">
-          <button className="btn small ghost" onClick={sync} disabled={syncing}>
+          <button size-="small" variant-="background2" onClick={sync} disabled={syncing}>
             {syncing ? "Syncing…" : "Sync from GitHub"}
           </button>
-          <button className="btn ghost" onClick={reload}>
+          <button size-="small" variant-="background2" onClick={reload}>
             ⟳ Refresh
           </button>
         </div>
       </div>
-      <p className="muted">
-        Open PRs across your connected repos. New PRs are detected automatically from GitHub events;
-        use “Sync from GitHub” to backfill PRs opened before detection was enabled. Reviewing a PR
-        consumes quota — auto-detection does not.
+      <p className="panel-desc">
+        New PRs are detected automatically from GitHub events; use “Sync from GitHub” to backfill
+        PRs opened before detection was enabled. Reviewing a PR consumes quota — auto-detection does
+        not.
       </p>
-      {msg && <div className="repo-msg muted">{msg}</div>}
-      <table className="table">
+      {msg && <div className="repo-msg">{msg}</div>}
+      <table className="tbl" divide-="horizontal">
         <thead>
           <tr>
             <th>Repo</th>
@@ -306,24 +348,24 @@ function PullsPanel() {
         <tbody>
           {data?.map((p) => (
             <tr key={p.id}>
-              <td className="mono">{p.repoFullName}</td>
+              <td>{p.repoFullName}</td>
               <td>
                 <a href={p.htmlUrl} target="_blank" rel="noreferrer">
                   #{p.number}
                 </a>
               </td>
               <td>
-                {p.title || <span className="muted">(no title)</span>}
-                {p.isDraft && <span className="badge subtle">draft</span>}
-                {!p.autoReviewEnabled && <span className="badge subtle">manual</span>}
+                {p.title || <span className="dim">(no title)</span>}{" "}
+                {p.isDraft && <Badge>draft</Badge>} {!p.autoReviewEnabled && <Badge>manual</Badge>}
               </td>
-              <td className="muted">{p.author ?? "—"}</td>
-              <td className="muted">
+              <td className="dim">{p.author ?? "—"}</td>
+              <td className="dim">
                 {p.prUpdatedAt ? new Date(p.prUpdatedAt).toLocaleString() : "—"}
               </td>
               <td>
                 <button
-                  className="btn small primary"
+                  className="btn-accent"
+                  size-="small"
                   disabled={busyId === p.id}
                   onClick={() => review(p)}
                 >
@@ -334,14 +376,14 @@ function PullsPanel() {
           ))}
           {!data?.length && (
             <tr>
-              <td colSpan={6} className="muted">
+              <td colSpan={6} className="dim">
                 No open PRs detected yet. Click “Sync from GitHub” to backfill existing ones.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </section>
+    </>
   );
 }
 
@@ -353,18 +395,17 @@ function RunnersPanel() {
   }, [reload]);
 
   return (
-    <section>
-      <div className="row between">
-        <h2>Runners</h2>
-        <button className="btn ghost" onClick={reload}>
+    <>
+      <div className="panel-head">
+        <span className="dim">Runners run on machines where Claude is logged in.</span>
+        <button size-="small" variant-="background2" onClick={reload}>
           ⟳ Refresh
         </button>
       </div>
-      <p className="muted">
-        Runners run on machines where Claude is logged in. Enroll one with the runner daemon and the
-        shared enrollment secret.
+      <p className="panel-desc">
+        Enroll one with the runner daemon and the shared enrollment secret.
       </p>
-      <table className="table">
+      <table className="tbl" divide-="horizontal">
         <thead>
           <tr>
             <th>Status</th>
@@ -378,14 +419,22 @@ function RunnersPanel() {
           {data?.map((r) => (
             <tr key={r.id}>
               <td>
-                <span className={`dot ${r.status}`} /> {r.status}
+                <Badge tone={r.status === "online" ? "green" : "neutral"} cap="round">
+                  {r.status}
+                </Badge>
               </td>
               <td>{r.name}</td>
-              <td className="muted">{r.capabilities?.providers?.join(", ")}</td>
-              <td className="muted">{r.lastSeenAt ? new Date(r.lastSeenAt).toLocaleString() : "—"}</td>
+              <td className="dim">{r.capabilities?.providers?.join(", ")}</td>
+              <td className="dim">
+                {r.lastSeenAt ? new Date(r.lastSeenAt).toLocaleString() : "—"}
+              </td>
               <td>
                 {!r.revokedAt && (
-                  <button className="link danger" onClick={() => api.revokeRunner(r.id).then(reload)}>
+                  <button
+                    className="btn-danger"
+                    size-="small"
+                    onClick={() => api.revokeRunner(r.id).then(reload)}
+                  >
                     revoke
                   </button>
                 )}
@@ -394,14 +443,14 @@ function RunnersPanel() {
           ))}
           {!data?.length && (
             <tr>
-              <td colSpan={5} className="muted">
+              <td colSpan={5} className="dim">
                 No runners enrolled.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </section>
+    </>
   );
 }
 
@@ -413,14 +462,14 @@ function ActivityPanel() {
   }, [reload]);
 
   return (
-    <section>
-      <div className="row between">
-        <h2>Activity</h2>
-        <button className="btn ghost" onClick={reload}>
+    <>
+      <div className="panel-head">
+        <span className="dim">Recent review jobs.</span>
+        <button size-="small" variant-="background2" onClick={reload}>
           ⟳ Refresh
         </button>
       </div>
-      <table className="table">
+      <table className="tbl" divide-="horizontal">
         <thead>
           <tr>
             <th>PR</th>
@@ -434,56 +483,62 @@ function ActivityPanel() {
           {data?.map((j) => (
             <tr key={j.id}>
               <td>
-                <span className="mono">{j.repoFullName}</span> #{j.prNumber}
+                {j.repoFullName} #{j.prNumber}
               </td>
               <td>
-                <span className={`state ${j.state}`}>{j.state}</span>
+                <JobBadge state={j.state} />
                 {j.errorMessage && <div className="err">{j.errorMessage}</div>}
               </td>
-              <td className="muted">{j.trigger}</td>
-              <td className="muted">{j.round}</td>
-              <td className="muted">{new Date(j.createdAt).toLocaleTimeString()}</td>
+              <td className="dim">{j.trigger}</td>
+              <td className="dim">{j.round}</td>
+              <td className="dim">{new Date(j.createdAt).toLocaleTimeString()}</td>
             </tr>
           ))}
           {!data?.length && (
             <tr>
-              <td colSpan={5} className="muted">
+              <td colSpan={5} className="dim">
                 No jobs yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </section>
+    </>
   );
 }
 
 function UsagePanel() {
   const { data } = useAsync<UsageSummary>(() => api.usage(), []);
   return (
-    <section>
-      <h2>Usage &amp; spend</h2>
+    <>
       <div className="stats">
         <Stat label="Today" value={data ? `$${data.today.toFixed(2)}` : "—"} />
         <Stat label="Last 7 days" value={data ? `$${data.last7d.toFixed(2)}` : "—"} />
         <Stat label="Last 30 days" value={data ? `$${data.last30d.toFixed(2)}` : "—"} />
         <Stat label="Total runs" value={data ? String(data.totalRuns) : "—"} />
       </div>
-      <p className="muted small">{data?.note}</p>
+      <p className="dim small">{data?.note}</p>
       {data && (
-        <a className="btn small ghost" href={data.claudeConsoleUrl} target="_blank" rel="noreferrer">
+        <a
+          is-="button"
+          size-="small"
+          variant-="background2"
+          href={data.claudeConsoleUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
           Open Claude usage console ↗
         </a>
       )}
-    </section>
+    </>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card stat">
+    <div className="stat" box-="round">
       <div className="stat-value">{value}</div>
-      <div className="stat-label muted">{label}</div>
+      <div className="stat-label">{label}</div>
     </div>
   );
 }

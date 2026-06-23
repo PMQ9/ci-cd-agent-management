@@ -61,8 +61,21 @@ GitHub ──webhook(HMAC)──▶ control-plane ──┐  posts review (Revie
   `client.ts`, `checkout.ts` (git fetch via `http.extraheader` so the token stays out of
   URLs/logs), `exec-claude.ts` (builds the prompt, spawns `claude -p`, parses the JSON
   wrapper + the agent's `ReviewOutput`, refuses if `ANTHROPIC_API_KEY` is set).
-- **`packages/dashboard`** — Vite + React SPA. `api.ts` (typed client, `credentials:
-  include`), `App.tsx` (Repos / Runners / Activity / Usage tabs).
+- **`packages/dashboard`** — Vite + React SPA, styled as a terminal UI with
+  **[WebTUI](https://webtui.ironclad.sh)** (`@webtui/css` + 5 theme plugins). `api.ts`
+  (typed client, `credentials: include`), `App.tsx` (left sidebar + Repos / Pull Requests /
+  Runners / Activity / Usage panels), `ui.tsx` (`Panel`/`Badge`/`JobBadge` helpers),
+  `theme.ts` + `ThemeSwitcher.tsx` (live theme switch, persisted to `localStorage`),
+  `webtui.d.ts` (types WebTUI's `is-`/`box-`/`variant-`/`cap-`/`size-` attributes for JSX).
+  - WebTUI is **attribute-styled** (`is-="badge"`, `box-="round"`, …) and **layer-based**:
+    `styles.css` starts with `@layer base, utils, components, app;` (MUST be line 1) and puts
+    all custom CSS in the trailing `@layer app` so it wins without `!important`.
+  - ⚠️ **Accent color names differ per theme** (Catppuccin `--mauve`, Nord `--nord*`, Gruvbox
+    `--gb-*`). Don't hardcode them — use the semantic `--acc-*` tokens (remapped per theme in
+    `styles.css`) for badge/button colors. Badge `variant-` only supports `foreground*`/
+    `background*`; colored badges set `--badge-color` via the `.b-*` classes.
+  - Theme is applied to `<html data-webtui-theme>` pre-paint by an inline script in
+    `index.html` (key/default mirror `theme.ts` — keep in sync).
 
 ## Data model (Postgres, `db/schema.ts`)
 

@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Agent PR Control Center</title>
+    <!-- Apply the saved WebTUI theme before first paint to avoid a flash.
+         Key + default mirror src/theme.ts — keep them in sync. -->
+    <script>
+      (function () {
+        try {
+          document.documentElement.setAttribute(
+            "data-webtui-theme",
+            localStorage.getItem("agentpr.theme") || "catppuccin-mocha",
+          );
+        } catch (e) {
+          document.documentElement.setAttribute("data-webtui-theme", "catppuccin-mocha");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
