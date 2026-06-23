@@ -344,55 +344,57 @@ function PullsPanel() {
         not.
       </p>
       {msg && <div className="repo-msg">{msg}</div>}
-      <table className="tbl" divide-="horizontal">
-        <thead>
-          <tr>
-            <th>Repo</th>
-            <th>PR</th>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Updated</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data?.map((p) => (
-            <tr key={p.id}>
-              <td>{p.repoFullName}</td>
-              <td>
-                <a href={p.htmlUrl} target="_blank" rel="noreferrer">
-                  #{p.number}
-                </a>
-              </td>
-              <td>
-                {p.title || <span className="dim">(no title)</span>}{" "}
-                {p.isDraft && <Badge>draft</Badge>} {!p.autoReviewEnabled && <Badge>manual</Badge>}
-              </td>
-              <td className="dim">{p.author ?? "—"}</td>
-              <td className="dim">
-                {p.prUpdatedAt ? new Date(p.prUpdatedAt).toLocaleString() : "—"}
-              </td>
-              <td>
-                <button
-                  className="btn-accent"
-                  size-="small"
-                  disabled={busyId === p.id}
-                  onClick={() => review(p)}
-                >
-                  {busyId === p.id ? "…" : "Review"}
-                </button>
-              </td>
-            </tr>
-          ))}
-          {!data?.length && (
+      <div className="table-wrap">
+        <table className="tbl" divide-="horizontal">
+          <thead>
             <tr>
-              <td colSpan={6} className="dim">
-                No open PRs detected yet. Click “Sync from GitHub” to backfill existing ones.
-              </td>
+              <th>Repo</th>
+              <th className="nowrap">PR</th>
+              <th>Title</th>
+              <th className="nowrap">Author</th>
+              <th className="nowrap">Updated</th>
+              <th className="nowrap" />
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data?.map((p) => (
+              <tr key={p.id}>
+                <td>{p.repoFullName}</td>
+                <td className="nowrap">
+                  <a href={p.htmlUrl} target="_blank" rel="noreferrer">
+                    #{p.number}
+                  </a>
+                </td>
+                <td>
+                  {p.title || <span className="dim">(no title)</span>}{" "}
+                  {p.isDraft && <Badge>draft</Badge>} {!p.autoReviewEnabled && <Badge>manual</Badge>}
+                </td>
+                <td className="dim nowrap">{p.author ?? "—"}</td>
+                <td className="dim nowrap">
+                  {p.prUpdatedAt ? new Date(p.prUpdatedAt).toLocaleString() : "—"}
+                </td>
+                <td className="nowrap">
+                  <button
+                    className="btn-accent"
+                    size-="small"
+                    disabled={busyId === p.id}
+                    onClick={() => review(p)}
+                  >
+                    {busyId === p.id ? "…" : "Review"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!data?.length && (
+              <tr>
+                <td colSpan={6} className="dim">
+                  No open PRs detected yet. Click “Sync from GitHub” to backfill existing ones.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
@@ -415,51 +417,53 @@ function RunnersPanel() {
       <p className="panel-desc">
         Enroll one with the runner daemon and the shared enrollment secret.
       </p>
-      <table className="tbl" divide-="horizontal">
-        <thead>
-          <tr>
-            <th>Status</th>
-            <th>Name</th>
-            <th>Providers</th>
-            <th>Last seen</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data?.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <Badge tone={r.status === "online" ? "green" : "neutral"} cap="round">
-                  {r.status}
-                </Badge>
-              </td>
-              <td>{r.name}</td>
-              <td className="dim">{r.capabilities?.providers?.join(", ")}</td>
-              <td className="dim">
-                {r.lastSeenAt ? new Date(r.lastSeenAt).toLocaleString() : "—"}
-              </td>
-              <td>
-                {!r.revokedAt && (
-                  <button
-                    className="btn-danger"
-                    size-="small"
-                    onClick={() => api.revokeRunner(r.id).then(reload)}
-                  >
-                    revoke
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-          {!data?.length && (
+      <div className="table-wrap">
+        <table className="tbl" divide-="horizontal">
+          <thead>
             <tr>
-              <td colSpan={5} className="dim">
-                No runners enrolled.
-              </td>
+              <th className="nowrap">Status</th>
+              <th>Name</th>
+              <th>Providers</th>
+              <th className="nowrap">Last seen</th>
+              <th className="nowrap" />
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data?.map((r) => (
+              <tr key={r.id}>
+                <td className="nowrap">
+                  <Badge tone={r.status === "online" ? "green" : "neutral"} cap="round">
+                    {r.status}
+                  </Badge>
+                </td>
+                <td>{r.name}</td>
+                <td className="dim">{r.capabilities?.providers?.join(", ")}</td>
+                <td className="dim nowrap">
+                  {r.lastSeenAt ? new Date(r.lastSeenAt).toLocaleString() : "—"}
+                </td>
+                <td className="nowrap">
+                  {!r.revokedAt && (
+                    <button
+                      className="btn-danger"
+                      size-="small"
+                      onClick={() => api.revokeRunner(r.id).then(reload)}
+                    >
+                      revoke
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!data?.length && (
+              <tr>
+                <td colSpan={5} className="dim">
+                  No runners enrolled.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
@@ -479,40 +483,42 @@ function ActivityPanel() {
           ⟳ Refresh
         </button>
       </div>
-      <table className="tbl" divide-="horizontal">
-        <thead>
-          <tr>
-            <th>PR</th>
-            <th>State</th>
-            <th>Trigger</th>
-            <th>Round</th>
-            <th>When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.map((j) => (
-            <tr key={j.id}>
-              <td>
-                {j.repoFullName} #{j.prNumber}
-              </td>
-              <td>
-                <JobBadge state={j.state} />
-                {j.errorMessage && <div className="err">{j.errorMessage}</div>}
-              </td>
-              <td className="dim">{j.trigger}</td>
-              <td className="dim">{j.round}</td>
-              <td className="dim">{new Date(j.createdAt).toLocaleTimeString()}</td>
-            </tr>
-          ))}
-          {!data?.length && (
+      <div className="table-wrap">
+        <table className="tbl" divide-="horizontal">
+          <thead>
             <tr>
-              <td colSpan={5} className="dim">
-                No jobs yet.
-              </td>
+              <th>PR</th>
+              <th>State</th>
+              <th className="nowrap">Trigger</th>
+              <th className="nowrap">Round</th>
+              <th className="nowrap">When</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data?.map((j) => (
+              <tr key={j.id}>
+                <td>
+                  {j.repoFullName} <span className="nowrap">#{j.prNumber}</span>
+                </td>
+                <td>
+                  <JobBadge state={j.state} />
+                  {j.errorMessage && <div className="err">{j.errorMessage}</div>}
+                </td>
+                <td className="dim nowrap">{j.trigger}</td>
+                <td className="dim nowrap">{j.round}</td>
+                <td className="dim nowrap">{new Date(j.createdAt).toLocaleTimeString()}</td>
+              </tr>
+            ))}
+            {!data?.length && (
+              <tr>
+                <td colSpan={5} className="dim">
+                  No jobs yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

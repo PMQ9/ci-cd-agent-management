@@ -96,7 +96,10 @@
   /* ---- layout: sidebar + main ------------------------------------------- */
   .layout {
     display: grid;
-    grid-template-columns: 18rem 1fr;
+    /* minmax(0, …) — NOT a bare 1fr (== minmax(auto,1fr)). The `auto` minimum lets a
+       wide child (a table's min-content) blow the track past the viewport, dragging the
+       panel's box border off-screen. minmax(0,…) lets the column shrink so children scroll. */
+    grid-template-columns: 18rem minmax(0, 1fr);
     min-height: 100vh;
   }
   .sidebar {
@@ -169,6 +172,7 @@
   .content {
     padding: 1lh 2ch;
     max-width: 84rem;
+    min-width: 0; /* allow this grid item to shrink below its content size (see .layout) */
   }
 
   /* ---- theme switcher ---------------------------------------------------- */
@@ -224,6 +228,7 @@
   /* ---- badges (colored) -------------------------------------------------- */
   [is-~="badge"] {
     font-size: 0.85em;
+    white-space: nowrap; /* status chips are single tokens — body's overflow-wrap:anywhere must not split them */
   }
   [is-~="badge"].b-green {
     --badge-color: var(--acc-green);
@@ -251,6 +256,15 @@
   }
 
   /* ---- buttons (accent overrides on top of WebTUI) ---------------------- */
+  /* Short action labels (table cells, inline review, toolbar) stay on one line;
+     without this the body's overflow-wrap:anywhere splits "Review" → "Revi/ew".
+     Scoped on purpose — long standalone buttons (e.g. "Open Claude usage console ↗")
+     keep their wrap safety net so they can't poke past a narrow viewport. */
+  .tbl td button,
+  .review-inline button,
+  .panel-head button {
+    white-space: nowrap;
+  }
   button.btn-accent,
   [is-~="button"].btn-accent {
     --button-primary: var(--acc-green);
@@ -326,8 +340,25 @@
   }
 
   /* ---- tables ------------------------------------------------------------ */
+  /* A too-narrow viewport scrolls the table *inside* the panel instead of crushing
+     columns or pushing the panel border off-screen. Pairs with .layout's minmax(0,…). */
+  .table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
   table.tbl {
     width: 100%;
+    /* Floor the table width so a narrow viewport scrolls the whole table (every column
+       stays readable) instead of crushing the flexible Repo/Title columns to one char
+       per line. Fits desktop content width without scrolling. */
+    min-width: 40rem;
+  }
+  /* Structured short cells (#40, dates, the action button) stay one line; long free
+     text (repo names, PR titles) keeps wrapping. Without this the body's
+     overflow-wrap:anywhere splits "#40" into "#4 / 0". Applies to cells and to inline
+     spans (e.g. the Activity "#NN" token inside an otherwise-wrapping repo cell). */
+  .nowrap {
+    white-space: nowrap;
   }
   .err {
     color: var(--acc-red);
@@ -339,7 +370,7 @@
   /* ---- stats ------------------------------------------------------------- */
   .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(18ch, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(18ch, 100%), 1fr));
     gap: 1ch;
     margin-bottom: 1lh;
   }
@@ -374,7 +405,7 @@
   /* ---- responsive -------------------------------------------------------- */
   @media (max-width: 760px) {
     .layout {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
     .sidebar {
       border-right: none;
@@ -383,6 +414,12 @@
     .nav {
       flex-direction: row;
       flex-wrap: wrap;
+    }
+    .content {
+      padding: 1lh 1ch; /* reclaim horizontal room on phones */
+    }
+    .panel-head {
+      flex-wrap: wrap; /* title + action buttons stack instead of squashing */
     }
     .review-inline {
       margin-left: 0;
