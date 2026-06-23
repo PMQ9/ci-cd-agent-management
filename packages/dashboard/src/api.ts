@@ -46,6 +46,13 @@ export interface PullRequestDTO {
   htmlUrl: string;
   autoReviewEnabled: boolean;
   prUpdatedAt: string | null;
+  // Latest review job for this PR (null when never reviewed). State is a JOB_STATES value.
+  jobId: string | null;
+  jobState: string | null;
+  jobRound: number | null;
+  jobTrigger: string | null;
+  jobErrorMessage: string | null;
+  jobUpdatedAt: string | null;
 }
 
 export interface UsageSummary {

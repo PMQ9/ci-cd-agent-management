@@ -321,4 +321,51 @@ describe("/api/pulls", () => {
     expect(sync.json().ok).toBe(true);
     expect(gh.listOpenPrs).toHaveBeenCalled();
   });
+
+  it("attaches the latest job per PR (newest wins) and null when never reviewed", async () => {
+    const repo = await makeRepo(holder.db, { fullName: "o/status" });
+    // PR 30: never reviewed → jobState null.
+    await holder.db.insert(pullRequests).values({
+      repoId: repo.id,
+      number: 30,
+      title: "No job",
+      state: "open",
+      htmlUrl: "https://github.com/o/status/pull/30",
+    });
+    // PR 31: two jobs — an older succeeded, then a newer queued (re-review).
+    await holder.db.insert(pullRequests).values({
+      repoId: repo.id,
+      number: 31,
+      title: "Re-reviewed",
+      state: "open",
+      htmlUrl: "https://github.com/o/status/pull/31",
+    });
+    await makeJob(holder.db, {
+      repoId: repo.id,
+      prNumber: 31,
+      state: "succeeded",
+      round: 1,
+      createdAt: new Date(Date.now() - 60_000),
+    });
+    const latestJob = await makeJob(holder.db, {
+      repoId: repo.id,
+      prNumber: 31,
+      state: "queued",
+      round: 2,
+      createdAt: new Date(),
+    });
+
+    const res = await app.inject({ method: "GET", url: "/api/pulls", headers: auth() });
+    expect(res.statusCode).toBe(200);
+    const byNumber = Object.fromEntries(res.json().map((r: any) => [r.number, r]));
+
+    expect(byNumber[30].jobState).toBeNull();
+    expect(byNumber[30].jobId).toBeNull();
+
+    // The newest job (round 2, queued) wins over the older succeeded one.
+    expect(byNumber[31].jobState).toBe("queued");
+    expect(byNumber[31].jobRound).toBe(2);
+    expect(byNumber[31].jobId).toBe(latestJob.id);
+    expect(typeof byNumber[31].jobUpdatedAt).toBe("string");
+  });
 });
