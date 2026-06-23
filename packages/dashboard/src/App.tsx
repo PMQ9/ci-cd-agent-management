@@ -158,9 +158,6 @@ function ReposPanel() {
     <>
       <div className="panel-head">
         <span className="dim">Repositories connected to the GitHub App.</span>
-        <button size-="small" variant-="background2" onClick={reload}>
-          ⟳ Refresh
-        </button>
       </div>
 
       <div className="connect" box-="square">
@@ -187,7 +184,7 @@ function ReposPanel() {
                   variant-="background2"
                   onClick={() => api.syncInstallation(i.id).then(reload)}
                 >
-                  Sync {i.accountLogin}
+                  Sync
                 </button>
               ))}
             </div>
