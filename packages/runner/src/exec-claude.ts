@@ -63,13 +63,50 @@ export function buildInstruction(opts: {
   return lines.join("\n");
 }
 
+// The valid characters that may follow a backslash in a JSON string.
+const VALID_JSON_ESCAPE = new Set(['"', "\\", "/", "b", "f", "n", "r", "t", "u"]);
+
+// Models routinely emit code snippets inside the `body` strings and "escape" their
+// backticks as `\`` — which is an INVALID JSON escape, so JSON.parse throws "Bad
+// escaped character" and we lose the whole structured review to the comment fallback.
+// Drop any backslash that doesn't begin a valid JSON escape (so `\`` → `` ` ``) while
+// leaving real escapes (`\\`, `\n`, `\uXXXX`, …) intact. Best-effort: only used after a
+// strict JSON.parse has already failed.
+export function repairInvalidEscapes(s: string): string {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") {
+      const next = s[i + 1];
+      if (next === undefined) {
+        out += ch; // trailing lone backslash — leave it for JSON.parse to reject
+      } else if (VALID_JSON_ESCAPE.has(next)) {
+        out += ch + next; // valid escape — keep the pair, skip the escaped char
+        i++;
+      }
+      // else: stray backslash before an invalid escape char → drop it, keep `next`
+      // (it gets copied on the next iteration since i is not advanced).
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 export function extractJsonObject(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced ? fenced[1]! : text;
   const start = candidate.indexOf("{");
   const end = candidate.lastIndexOf("}");
   if (start === -1 || end === -1 || end < start) throw new Error("no JSON object found");
-  return JSON.parse(candidate.slice(start, end + 1));
+  const slice = candidate.slice(start, end + 1);
+  try {
+    return JSON.parse(slice);
+  } catch {
+    // Retry once after repairing invalid backslash escapes (the common model mistake
+    // of escaping backticks/other chars inside code-bearing string values).
+    return JSON.parse(repairInvalidEscapes(slice));
+  }
 }
 
 export function parseClaudeWrapper(stdout: string): AgentRunResult {
