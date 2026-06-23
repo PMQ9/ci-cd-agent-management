@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
-import { makeJob, makeRepo } from "./harness/factories.js";
+import { describe, expect, it, vi } from "vitest";
 import { jobs } from "../src/db/schema.js";
+import { makeJob, makeRepo } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -82,8 +82,16 @@ describe("enqueueReview", () => {
   it("does not supersede jobs for a different PR or repo", async () => {
     const repo = await makeRepo(holder.db);
     const otherRepo = await makeRepo(holder.db);
-    const keepOtherPr = await makeJob(holder.db, { repoId: repo.id, prNumber: 99, state: "queued" });
-    const keepOtherRepo = await makeJob(holder.db, { repoId: otherRepo.id, prNumber: 5, state: "queued" });
+    const keepOtherPr = await makeJob(holder.db, {
+      repoId: repo.id,
+      prNumber: 99,
+      state: "queued",
+    });
+    const keepOtherRepo = await makeJob(holder.db, {
+      repoId: otherRepo.id,
+      prNumber: 5,
+      state: "queued",
+    });
 
     await enqueueReview({
       repoId: repo.id,
@@ -115,7 +123,11 @@ describe("supersedeActiveForPr", () => {
         }),
       ),
     );
-    const succeeded = await makeJob(holder.db, { repoId: repo.id, prNumber: 7, state: "succeeded" });
+    const succeeded = await makeJob(holder.db, {
+      repoId: repo.id,
+      prNumber: 7,
+      state: "succeeded",
+    });
     const failed = await makeJob(holder.db, { repoId: repo.id, prNumber: 7, state: "failed" });
     void runner;
 

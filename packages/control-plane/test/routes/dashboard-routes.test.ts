@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { installDbLifecycle, type DbHolder } from "../harness/setup-db.js";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { pullRequests, repos, templates } from "../../src/db/schema.js";
 import {
   makeFinding,
   makeJob,
@@ -12,7 +12,7 @@ import {
   makeUsageEvent,
 } from "../harness/factories.js";
 import { getSessionCookie } from "../harness/http.js";
-import { pullRequests, repos, templates } from "../../src/db/schema.js";
+import { type DbHolder, installDbLifecycle } from "../harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../../src/db/client.js", () => ({
@@ -136,15 +136,28 @@ describe("/api/repos", () => {
 
   it("POST /api/repos/:id/review 400 when prNumber is missing/invalid", async () => {
     const repo = await makeRepo(holder.db);
-    const res = await app.inject({ method: "POST", url: `/api/repos/${repo.id}/review`, headers: auth(), payload: {} });
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/repos/${repo.id}/review`,
+      headers: auth(),
+      payload: {},
+    });
     expect(res.statusCode).toBe(400);
   });
 });
 
 describe("/api/templates", () => {
   it("activating a pr_review template demotes the previously-active one (single active rubric)", async () => {
-    const a = await makeTemplate(holder.db, { slug: "rubric-a", kind: "pr_review", isActive: true });
-    const b = await makeTemplate(holder.db, { slug: "rubric-b", kind: "pr_review", isActive: false });
+    const a = await makeTemplate(holder.db, {
+      slug: "rubric-a",
+      kind: "pr_review",
+      isActive: true,
+    });
+    const b = await makeTemplate(holder.db, {
+      slug: "rubric-b",
+      kind: "pr_review",
+      isActive: false,
+    });
 
     const res = await app.inject({
       method: "PATCH",
@@ -167,7 +180,12 @@ describe("/api/templates", () => {
 
   it("PATCH 400 on invalid body (empty content) and 404 on unknown id", async () => {
     const t = await makeTemplate(holder.db);
-    const bad = await app.inject({ method: "PATCH", url: `/api/templates/${t.id}`, headers: auth(), payload: { content: "" } });
+    const bad = await app.inject({
+      method: "PATCH",
+      url: `/api/templates/${t.id}`,
+      headers: auth(),
+      payload: { content: "" },
+    });
     expect(bad.statusCode).toBe(400);
     const missing = await app.inject({
       method: "PATCH",
@@ -241,7 +259,11 @@ describe("/api/jobs", () => {
     expect(detail.statusCode).toBe(200);
     expect(detail.json().reviews[0].findings[0].title).toBe("f1");
 
-    const missing = await app.inject({ method: "GET", url: `/api/jobs/${crypto.randomUUID()}`, headers: auth() });
+    const missing = await app.inject({
+      method: "GET",
+      url: `/api/jobs/${crypto.randomUUID()}`,
+      headers: auth(),
+    });
     expect(missing.statusCode).toBe(404);
   });
 });
@@ -289,7 +311,12 @@ describe("/api/pulls", () => {
     const row = res.json().find((r: any) => r.number === 21);
     expect(row.repoFullName).toBe("o/inbox");
 
-    const sync = await app.inject({ method: "POST", url: "/api/pulls/sync", headers: auth(), payload: {} });
+    const sync = await app.inject({
+      method: "POST",
+      url: "/api/pulls/sync",
+      headers: auth(),
+      payload: {},
+    });
     expect(sync.statusCode).toBe(200);
     expect(sync.json().ok).toBe(true);
     expect(gh.listOpenPrs).toHaveBeenCalled();

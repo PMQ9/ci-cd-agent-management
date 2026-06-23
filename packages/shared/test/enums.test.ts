@@ -1,18 +1,18 @@
-import { describe, it, expect } from "vitest";
 import {
-  TRIGGER_SOURCES,
-  JOB_STATES,
   ACTIVE_JOB_STATES,
-  TERMINAL_JOB_STATES,
-  PROVIDERS,
-  VERDICTS,
   FINDING_STATUSES,
-  SEVERITIES,
-  RUNNER_STATUSES,
+  JOB_STATES,
   PR_STATES,
-  TEMPLATE_KINDS,
+  PROVIDERS,
   REVIEW_OUTPUT_CONTRACT_PROMPT,
+  RUNNER_STATUSES,
+  SEVERITIES,
+  TEMPLATE_KINDS,
+  TERMINAL_JOB_STATES,
+  TRIGGER_SOURCES,
+  VERDICTS,
 } from "@agentpr/shared";
+import { describe, expect, it } from "vitest";
 
 // These tests pin the canonical enum tuples. enums.ts is the single source of
 // truth shared by Zod and Drizzle pgEnums, so any drift here breaks the DB↔app
@@ -47,12 +47,7 @@ describe("enum tuple membership (drift guards)", () => {
   });
 
   it("TERMINAL_JOB_STATES is exactly succeeded/failed/cancelled/superseded", () => {
-    expectExactMembers(TERMINAL_JOB_STATES, [
-      "succeeded",
-      "failed",
-      "cancelled",
-      "superseded",
-    ]);
+    expectExactMembers(TERMINAL_JOB_STATES, ["succeeded", "failed", "cancelled", "superseded"]);
   });
 
   it("PROVIDERS is exactly claude_code/opencode", () => {
@@ -80,11 +75,7 @@ describe("enum tuple membership (drift guards)", () => {
   });
 
   it("TEMPLATE_KINDS is exactly pr_review/pull_request/security_review", () => {
-    expectExactMembers(TEMPLATE_KINDS, [
-      "pr_review",
-      "pull_request",
-      "security_review",
-    ]);
+    expectExactMembers(TEMPLATE_KINDS, ["pr_review", "pull_request", "security_review"]);
   });
 });
 
@@ -96,15 +87,10 @@ describe("ACTIVE_JOB_STATES + TERMINAL_JOB_STATES partition JOB_STATES", () => {
   });
 
   it("together cover every JOB_STATES value (full partition)", () => {
-    const union = new Set<string>([
-      ...ACTIVE_JOB_STATES,
-      ...TERMINAL_JOB_STATES,
-    ]);
+    const union = new Set<string>([...ACTIVE_JOB_STATES, ...TERMINAL_JOB_STATES]);
     expectExactMembers([...union], [...JOB_STATES]);
     // exact count: active + terminal == job states, with no overlap counted above
-    expect(ACTIVE_JOB_STATES.length + TERMINAL_JOB_STATES.length).toBe(
-      JOB_STATES.length,
-    );
+    expect(ACTIVE_JOB_STATES.length + TERMINAL_JOB_STATES.length).toBe(JOB_STATES.length);
   });
 
   it("every active state is a member of JOB_STATES", () => {

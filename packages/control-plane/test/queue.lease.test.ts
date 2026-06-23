@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
 import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -42,7 +42,14 @@ describe("leaseNextJob", () => {
   it("never leases terminal or already-leased jobs", async () => {
     const repo = await makeRepo(holder.db);
     const runner = await makeRunner(holder.db);
-    for (const state of ["leased", "running", "succeeded", "failed", "cancelled", "superseded"] as const) {
+    for (const state of [
+      "leased",
+      "running",
+      "succeeded",
+      "failed",
+      "cancelled",
+      "superseded",
+    ] as const) {
       await makeJob(holder.db, { repoId: repo.id, prNumber: 1, state });
     }
     expect(await leaseNextJob(runner.id)).toBeNull();

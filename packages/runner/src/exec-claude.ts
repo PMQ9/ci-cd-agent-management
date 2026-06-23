@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { ReviewOutputSchema, type PriorFinding, type ReviewOutput } from "@agentpr/shared";
+import { type PriorFinding, type ReviewOutput, ReviewOutputSchema } from "@agentpr/shared";
 
 export interface AgentRunResult {
   review: ReviewOutput;

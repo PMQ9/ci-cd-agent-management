@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { AgentFinding, Severity } from "@agentpr/shared";
+import { describe, expect, it } from "vitest";
 import { renderTemplateBody } from "../src/github/app.js";
 
 // Pure-unit tests for renderTemplateBody. postReview needs Octokit and is NOT
@@ -38,7 +38,9 @@ function bucketText(body: string, heading: string): string {
 describe("renderTemplateBody — severity bucketing", () => {
   it("routes all 5 severities into the right 🔴/🟡/🟢 bucket and drops none", () => {
     const severities: Severity[] = ["critical", "high", "medium", "low", "info"];
-    const findings = severities.map((s) => finding({ severity: s, title: `T-${s}`, path: `${s}.ts` }));
+    const findings = severities.map((s) =>
+      finding({ severity: s, title: `T-${s}`, path: `${s}.ts` }),
+    );
     const body = renderTemplateBody({ ...baseOpts, findings });
 
     const high = bucketText(body, "### 🔴 High");

@@ -131,10 +131,11 @@ function ensurePostgres() {
     process.exit(1);
   }
   log("db", "starting Postgres (docker compose up -d --wait postgres)…");
-  const ok = spawnSync("docker", ["compose", "up", "-d", "--wait", "postgres"], {
-    cwd: ROOT,
-    stdio: "inherit",
-  }).status === 0;
+  const ok =
+    spawnSync("docker", ["compose", "up", "-d", "--wait", "postgres"], {
+      cwd: ROOT,
+      stdio: "inherit",
+    }).status === 0;
   if (!ok) {
     log("db", "failed to bring up Postgres", C.red);
     process.exit(1);
@@ -200,10 +201,11 @@ function startControlPlane() {
 
   if (BUILD_CP) {
     log("control-plane", "compiling (tsup)…", C.magenta);
-    const built = spawnSync("pnpm", ["--filter", "@agentpr/control-plane", "build"], {
-      cwd: ROOT,
-      stdio: "inherit",
-    }).status === 0;
+    const built =
+      spawnSync("pnpm", ["--filter", "@agentpr/control-plane", "build"], {
+        cwd: ROOT,
+        stdio: "inherit",
+      }).status === 0;
     if (!built) {
       log("control-plane", "build failed", C.red);
       shutdown(1);

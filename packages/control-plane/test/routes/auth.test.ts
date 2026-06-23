@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { installDbLifecycle, type DbHolder } from "../harness/setup-db.js";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getSessionCookie } from "../harness/http.js";
+import { type DbHolder, installDbLifecycle } from "../harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../../src/db/client.js", () => ({
@@ -64,13 +64,21 @@ describe("requireUser (via /auth/me)", () => {
   });
 
   it("401 for a cookie that fails signature verification", async () => {
-    const res = await app.inject({ method: "GET", url: "/auth/me", headers: { cookie: "session=forged-value" } });
+    const res = await app.inject({
+      method: "GET",
+      url: "/auth/me",
+      headers: { cookie: "session=forged-value" },
+    });
     expect(res.statusCode).toBe(401);
   });
 
   it("403 for a validly-signed cookie whose login is not allowlisted", async () => {
     const signed = app.signCookie("intruder");
-    const res = await app.inject({ method: "GET", url: "/auth/me", headers: { cookie: `session=${signed}` } });
+    const res = await app.inject({
+      method: "GET",
+      url: "/auth/me",
+      headers: { cookie: `session=${signed}` },
+    });
     expect(res.statusCode).toBe(403);
     expect(res.json().error.code).toBe("forbidden");
   });

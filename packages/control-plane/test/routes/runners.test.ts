@@ -1,11 +1,11 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { installDbLifecycle, type DbHolder } from "../harness/setup-db.js";
-import { makeJob, makeRepo } from "../harness/factories.js";
-import { getSessionCookie } from "../harness/http.js";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { reviews, runners, usageEvents } from "../../src/db/schema.js";
 import { sha256 } from "../../src/util/crypto.js";
+import { makeJob, makeRepo } from "../harness/factories.js";
+import { getSessionCookie } from "../harness/http.js";
+import { type DbHolder, installDbLifecycle } from "../harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../../src/db/client.js", () => ({
@@ -52,7 +52,11 @@ async function enroll(name = "runner-x") {
   const res = await app.inject({
     method: "POST",
     url: "/api/runners/enroll",
-    payload: { enrollmentSecret: ENROLL_SECRET, name, capabilities: { providers: ["claude_code"], version: "0.2.0" } },
+    payload: {
+      enrollmentSecret: ENROLL_SECRET,
+      name,
+      capabilities: { providers: ["claude_code"], version: "0.2.0" },
+    },
   });
   return res;
 }
@@ -76,7 +80,11 @@ function validResult(leaseId: string) {
 
 describe("POST /api/runners/enroll", () => {
   it("rejects an invalid body with 400", async () => {
-    const res = await app.inject({ method: "POST", url: "/api/runners/enroll", payload: { name: "x" } });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/runners/enroll",
+      payload: { name: "x" },
+    });
     expect(res.statusCode).toBe(400);
     expect(res.json().error.code).toBe("bad_request");
   });
@@ -85,7 +93,11 @@ describe("POST /api/runners/enroll", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/runners/enroll",
-      payload: { enrollmentSecret: "wrong", name: "x", capabilities: { providers: ["claude_code"] } },
+      payload: {
+        enrollmentSecret: "wrong",
+        name: "x",
+        capabilities: { providers: ["claude_code"] },
+      },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().error.code).toBe("forbidden");
@@ -97,7 +109,11 @@ describe("POST /api/runners/enroll", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/runners/enroll",
-      payload: { enrollmentSecret: sameLenWrong, name: "x", capabilities: { providers: ["claude_code"] } },
+      payload: {
+        enrollmentSecret: sameLenWrong,
+        name: "x",
+        capabilities: { providers: ["claude_code"] },
+      },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -267,7 +283,10 @@ describe("POST /api/runners/result", () => {
 
     // And no double WRITE: exactly one review + one usage row for the job.
     const reviewRows = await holder.db.select().from(reviews).where(eq(reviews.jobId, job.jobId));
-    const usageRows = await holder.db.select().from(usageEvents).where(eq(usageEvents.jobId, job.jobId));
+    const usageRows = await holder.db
+      .select()
+      .from(usageEvents)
+      .where(eq(usageEvents.jobId, job.jobId));
     expect(reviewRows).toHaveLength(1);
     expect(usageRows).toHaveLength(1);
   });
@@ -335,7 +354,10 @@ describe("POST /api/runners/error", () => {
     });
     expect(second.statusCode).toBe(200);
 
-    const usageRows = await holder.db.select().from(usageEvents).where(eq(usageEvents.jobId, job.jobId));
+    const usageRows = await holder.db
+      .select()
+      .from(usageEvents)
+      .where(eq(usageEvents.jobId, job.jobId));
     expect(usageRows).toHaveLength(1); // charged once, not twice
   });
 });
@@ -355,7 +377,12 @@ describe("GET /api/runners + revoke (requireUser)", () => {
     const online = res.json().find((r: any) => r.id === runnerId);
     expect(online.status).toBe("online");
 
-    await app.inject({ method: "POST", url: `/api/runners/${runnerId}/revoke`, headers: { cookie }, payload: {} });
+    await app.inject({
+      method: "POST",
+      url: `/api/runners/${runnerId}/revoke`,
+      headers: { cookie },
+      payload: {},
+    });
     res = await app.inject({ method: "GET", url: "/api/runners", headers: { cookie } });
     const revoked = res.json().find((r: any) => r.id === runnerId);
     expect(revoked.status).toBe("offline");

@@ -7,22 +7,22 @@
 // JOB_STATES tuple from shared's source via a relative path instead. This is
 // still the single source of truth (shared/src re-exports it), so the drift
 // guard below ("every job state renders") stays honest.
-import { JOB_STATES } from "../../shared/src/index.js";
+
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { JOB_STATES } from "../../shared/src/index.js";
 import { Badge, JobBadge, Panel } from "../src/ui.js";
 
 describe("JobBadge", () => {
-  it.each(JOB_STATES.map((s) => [s]))(
-    "renders the '%s' job state text without crashing (drift guard)",
-    (state) => {
-      const { container } = render(<JobBadge state={state} />);
-      // the state label is rendered as the badge text
-      expect(screen.getByText(state)).toBeInTheDocument();
-      // it renders a WebTUI badge element
-      expect(container.querySelector('[is-="badge"]')).not.toBeNull();
-    },
-  );
+  it.each(
+    JOB_STATES.map((s) => [s]),
+  )("renders the '%s' job state text without crashing (drift guard)", (state) => {
+    const { container } = render(<JobBadge state={state} />);
+    // the state label is rendered as the badge text
+    expect(screen.getByText(state)).toBeInTheDocument();
+    // it renders a WebTUI badge element
+    expect(container.querySelector('[is-="badge"]')).not.toBeNull();
+  });
 
   it("renders an unknown state and falls back to the neutral tone (no b-* class)", () => {
     const { container } = render(<JobBadge state="weird" />);
@@ -74,13 +74,16 @@ describe("Badge", () => {
     expect(badge.getAttribute("variant-")).toBeNull();
   });
 
-  it.each(["red", "blue", "yellow", "mauve", "peach"] as const)(
-    "tone '%s' produces class b-%s",
-    (tone) => {
-      const { container } = render(<Badge tone={tone}>x</Badge>);
-      expect(container.querySelector('[is-="badge"]')!.className).toBe(`b-${tone}`);
-    },
-  );
+  it.each([
+    "red",
+    "blue",
+    "yellow",
+    "mauve",
+    "peach",
+  ] as const)("tone '%s' produces class b-%s", (tone) => {
+    const { container } = render(<Badge tone={tone}>x</Badge>);
+    expect(container.querySelector('[is-="badge"]')!.className).toBe(`b-${tone}`);
+  });
 
   it("passes a cap shape through to the cap- attribute", () => {
     const { container } = render(

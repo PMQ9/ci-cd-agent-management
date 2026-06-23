@@ -105,9 +105,7 @@ describe("App auth gate", () => {
     expect(panelTitle!.textContent).toBe("Repositories");
 
     // A repos-panel-specific string confirms ReposPanel actually mounted.
-    expect(
-      screen.getByText("Repositories connected to the GitHub App."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Repositories connected to the GitHub App.")).toBeInTheDocument();
 
     // The login screen affordance must NOT be present in the authed shell.
     expect(screen.queryByText(/sign in with github/i)).not.toBeInTheDocument();

@@ -1,5 +1,3 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   EnrollRequestSchema,
   JobErrorSchema,
@@ -7,11 +5,13 @@ import {
   type LeaseJob,
   type LeaseResponse,
 } from "@agentpr/shared";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { requireUser } from "../auth.js";
 import { env } from "../config.js";
 import { db } from "../db/client.js";
-import { repos, runners, type RunnerRow } from "../db/schema.js";
-import { postReview } from "../github/app.js";
-import { mintRepoToken } from "../github/app.js";
+import { type RunnerRow, repos, runners } from "../db/schema.js";
+import { mintRepoToken, postReview } from "../github/app.js";
 import {
   findJobByLease,
   leaseNextJob,
@@ -22,8 +22,7 @@ import {
   touchRunner,
 } from "../queue.js";
 import { assembleReviewInstruction, loadReviewPromptParts } from "../review-prompt.js";
-import { requireUser } from "../auth.js";
-import { safeEqualHex, sha256, randomToken } from "../util/crypto.js";
+import { randomToken, safeEqualHex, sha256 } from "../util/crypto.js";
 
 type WithRunner = FastifyRequest & { runner?: RunnerRow };
 
@@ -31,7 +30,9 @@ async function requireRunner(request: WithRunner, reply: FastifyReply): Promise<
   const auth = request.headers.authorization;
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
   if (!token) {
-    await reply.code(401).send({ error: { code: "unauthenticated", message: "Missing runner token" } });
+    await reply
+      .code(401)
+      .send({ error: { code: "unauthenticated", message: "Missing runner token" } });
     return;
   }
   const [runner] = await db
@@ -40,7 +41,9 @@ async function requireRunner(request: WithRunner, reply: FastifyReply): Promise<
     .where(and(eq(runners.tokenHash, sha256(token)), isNull(runners.revokedAt)))
     .limit(1);
   if (!runner) {
-    await reply.code(401).send({ error: { code: "unauthenticated", message: "Invalid runner token" } });
+    await reply
+      .code(401)
+      .send({ error: { code: "unauthenticated", message: "Invalid runner token" } });
     return;
   }
   request.runner = runner;
@@ -51,10 +54,14 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
   app.post("/api/runners/enroll", async (request, reply) => {
     const parsed = EnrollRequestSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: { code: "bad_request", message: "Invalid enrollment" } });
+      return reply
+        .code(400)
+        .send({ error: { code: "bad_request", message: "Invalid enrollment" } });
     }
     if (!safeEqualHex(parsed.data.enrollmentSecret, env.RUNNER_ENROLLMENT_SECRET)) {
-      return reply.code(403).send({ error: { code: "forbidden", message: "Bad enrollment secret" } });
+      return reply
+        .code(403)
+        .send({ error: { code: "forbidden", message: "Bad enrollment secret" } });
     }
     const runnerToken = randomToken(32);
     const [runner] = await db
@@ -160,7 +167,9 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
     const runner = (request as WithRunner).runner!;
     const parsed = JobErrorSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: { code: "bad_request", message: "Invalid error report" } });
+      return reply
+        .code(400)
+        .send({ error: { code: "bad_request", message: "Invalid error report" } });
     }
     const job = await findJobByLease(parsed.data.leaseId);
     if (!job || job.leasedByRunner !== runner.id) {
@@ -191,7 +200,10 @@ export function registerRunnerRoutes(app: FastifyInstance): void {
     "/api/runners/:id/revoke",
     { preHandler: requireUser },
     async (request) => {
-      await db.update(runners).set({ revokedAt: new Date() }).where(eq(runners.id, request.params.id));
+      await db
+        .update(runners)
+        .set({ revokedAt: new Date() })
+        .where(eq(runners.id, request.params.id));
       return { ok: true };
     },
   );

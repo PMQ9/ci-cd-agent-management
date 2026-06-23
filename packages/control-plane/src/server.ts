@@ -1,7 +1,7 @@
 import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
-import { env, isProd } from "./config.js";
 import { registerAuth } from "./auth.js";
+import { env, isProd } from "./config.js";
 import { sweepExpiredLeases } from "./queue.js";
 import { registerJobRoutes } from "./routes/jobs.js";
 import { registerPromptRoutes } from "./routes/prompts.js";
@@ -49,7 +49,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     const auth = request.headers.authorization;
     const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
     if (!token || !safeEqualHex(token, env.INTERNAL_API_TOKEN)) {
-      return reply.code(401).send({ error: { code: "unauthenticated", message: "Bad internal token" } });
+      return reply
+        .code(401)
+        .send({ error: { code: "unauthenticated", message: "Bad internal token" } });
     }
     const requeued = await sweepExpiredLeases();
     if (requeued) request.log.info({ requeued }, "swept expired leases (http)");

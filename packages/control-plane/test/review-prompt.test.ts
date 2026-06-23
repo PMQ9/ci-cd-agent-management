@@ -1,5 +1,5 @@
+import { type PriorFinding, REVIEW_OUTPUT_CONTRACT_PROMPT } from "@agentpr/shared";
 import { describe, expect, it } from "vitest";
-import { REVIEW_OUTPUT_CONTRACT_PROMPT, type PriorFinding } from "@agentpr/shared";
 import {
   assembleReviewInstruction,
   type ReviewContext,
@@ -40,9 +40,11 @@ const priorFinding = (over: Partial<PriorFinding> = {}): PriorFinding => ({
 describe("assembleReviewInstruction — round 1 (initial review)", () => {
   it("starts with the PR header containing the 12-char base/head slices and the stdin note", () => {
     const out = assembleReviewInstruction(makeParts(), makeCtx());
-    expect(out.startsWith(
-      "Reviewing PR #42 of octo/widgets (base abcdef012345 .. head fedcba987654). The diff is on stdin.",
-    )).toBe(true);
+    expect(
+      out.startsWith(
+        "Reviewing PR #42 of octo/widgets (base abcdef012345 .. head fedcba987654). The diff is on stdin.",
+      ),
+    ).toBe(true);
   });
 
   it("includes the trimmed persona and rules", () => {
@@ -119,10 +121,7 @@ describe("assembleReviewInstruction — re-review (round > 1)", () => {
   });
 
   it("OMITS the re-review block when round > 1 but priorFindings is empty (boundary)", () => {
-    const out = assembleReviewInstruction(
-      makeParts(),
-      makeCtx({ round: 5, priorFindings: [] }),
-    );
+    const out = assembleReviewInstruction(makeParts(), makeCtx({ round: 5, priorFindings: [] }));
     expect(out).not.toContain("RE-REVIEW round");
     expect(out).not.toContain("Previous round's findings:");
   });
@@ -138,20 +137,14 @@ describe("assembleReviewInstruction — SHA slicing", () => {
   });
 
   it("does not pad when SHAs are SHORTER than 12 chars (exact substring)", () => {
-    const out = assembleReviewInstruction(
-      makeParts(),
-      makeCtx({ baseSha: "abc", headSha: "de" }),
-    );
+    const out = assembleReviewInstruction(makeParts(), makeCtx({ baseSha: "abc", headSha: "de" }));
     expect(out).toContain("(base abc .. head de). The diff is on stdin.");
     // no padding characters / no spillover spaces between slice and the dots
     expect(out).not.toContain("base abc  ");
   });
 
   it("handles empty SHAs as empty substrings", () => {
-    const out = assembleReviewInstruction(
-      makeParts(),
-      makeCtx({ baseSha: "", headSha: "" }),
-    );
+    const out = assembleReviewInstruction(makeParts(), makeCtx({ baseSha: "", headSha: "" }));
     expect(out).toContain("(base  .. head ). The diff is on stdin.");
   });
 });

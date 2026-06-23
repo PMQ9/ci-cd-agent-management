@@ -2,11 +2,11 @@
 // resilience, and applyTheme's DOM attribute + persistence side-effects.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyTheme,
   DEFAULT_THEME,
+  getStoredTheme,
   THEME_GROUPS,
   THEME_STORAGE_KEY,
-  applyTheme,
-  getStoredTheme,
 } from "../src/theme.js";
 
 const VALID_IDS = THEME_GROUPS.flatMap((g) => g.options.map((o) => o.id));
@@ -102,9 +102,7 @@ describe("getStoredTheme", () => {
 describe("applyTheme", () => {
   it("sets data-webtui-theme on <html> to the given id", () => {
     applyTheme("gruvbox-light-medium");
-    expect(
-      document.documentElement.getAttribute("data-webtui-theme"),
-    ).toBe("gruvbox-light-medium");
+    expect(document.documentElement.getAttribute("data-webtui-theme")).toBe("gruvbox-light-medium");
   });
 
   it("persists the id to localStorage under THEME_STORAGE_KEY", () => {

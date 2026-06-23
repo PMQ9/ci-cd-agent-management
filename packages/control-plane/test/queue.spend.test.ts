@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
 import { makeJob, makeRepo, makeUsageEvent } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -18,7 +18,11 @@ const { autoReviewBlockedReason } = await import("../src/queue.js");
 // Insert today-dated spend for a repo (usage event must join to a job in that repo).
 async function addSpend(repoId: string, cost: string, createdAt?: Date) {
   const job = await makeJob(holder.db, { repoId });
-  await makeUsageEvent(holder.db, { jobId: job.id, costUsd: cost, ...(createdAt ? { createdAt } : {}) });
+  await makeUsageEvent(holder.db, {
+    jobId: job.id,
+    costUsd: cost,
+    ...(createdAt ? { createdAt } : {}),
+  });
 }
 
 describe("autoReviewBlockedReason — per-repo daily cap", () => {
@@ -57,7 +61,9 @@ describe("autoReviewBlockedReason — per-repo daily cap", () => {
   it("ignores a non-numeric cap (NaN → skips the check)", async () => {
     const repo = await makeRepo(holder.db);
     await addSpend(repo.id, "100.0000");
-    expect(await autoReviewBlockedReason({ id: repo.id, dailyCostCapUsd: "not-a-number" })).toBeNull();
+    expect(
+      await autoReviewBlockedReason({ id: repo.id, dailyCostCapUsd: "not-a-number" }),
+    ).toBeNull();
   });
 
   it("only counts a repo's own spend (other repos do not push it over)", async () => {

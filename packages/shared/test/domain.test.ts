@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
 import {
-  RepoSchema,
-  PullRequestSchema,
-  RunnerSchema,
-  JobSchema,
   FindingSchema,
+  JobSchema,
+  PullRequestSchema,
+  RepoSchema,
   ReviewSchema,
+  RunnerSchema,
   UsageEventSchema,
 } from "@agentpr/shared";
+import { describe, expect, it } from "vitest";
 
 const UUID = "123e4567-e89b-42d3-a456-426614174000";
 const UUID2 = "00000000-0000-4000-8000-000000000000";
@@ -32,7 +32,9 @@ describe("RepoSchema", () => {
 
   it("round-trips a valid repo (model & cap nullable)", () => {
     expect(RepoSchema.safeParse(valid).success).toBe(true);
-    expect(RepoSchema.safeParse({ ...valid, model: "claude-opus", dailyCostCapUsd: null }).success).toBe(true);
+    expect(
+      RepoSchema.safeParse({ ...valid, model: "claude-opus", dailyCostCapUsd: null }).success,
+    ).toBe(true);
   });
 
   it("REJECTS a non-uuid id", () => {
@@ -75,7 +77,9 @@ describe("PullRequestSchema", () => {
 
   it("round-trips a valid PR (author & prUpdatedAt nullable)", () => {
     expect(PullRequestSchema.safeParse(valid).success).toBe(true);
-    expect(PullRequestSchema.safeParse({ ...valid, author: null, prUpdatedAt: null }).success).toBe(true);
+    expect(PullRequestSchema.safeParse({ ...valid, author: null, prUpdatedAt: null }).success).toBe(
+      true,
+    );
   });
 
   it("REJECTS an invalid state enum", () => {
@@ -121,10 +125,9 @@ describe("RunnerSchema", () => {
   });
 
   it("REJECTS an invalid provider in capabilities", () => {
-    expect(
-      RunnerSchema.safeParse({ ...valid, capabilities: { providers: ["gpt"] } })
-        .success,
-    ).toBe(false);
+    expect(RunnerSchema.safeParse({ ...valid, capabilities: { providers: ["gpt"] } }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -153,8 +156,7 @@ describe("JobSchema", () => {
 
   it("accepts uuid leasedByRunner / preferredRunnerId", () => {
     expect(
-      JobSchema.safeParse({ ...valid, leasedByRunner: UUID, preferredRunnerId: UUID2 })
-        .success,
+      JobSchema.safeParse({ ...valid, leasedByRunner: UUID, preferredRunnerId: UUID2 }).success,
     ).toBe(true);
   });
 

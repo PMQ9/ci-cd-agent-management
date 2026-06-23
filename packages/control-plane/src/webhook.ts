@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { env, githubConfigured } from "./config.js";
+import { markPullRequestClosed, upsertPullRequest } from "./github/pr-sync.js";
 import {
   findRepoByGithubId,
   removeInstallation,
@@ -8,7 +9,6 @@ import {
   syncInstallationRepos,
   upsertInstallation,
 } from "./github/sync.js";
-import { markPullRequestClosed, upsertPullRequest } from "./github/pr-sync.js";
 import { triggerReviewForPr } from "./review-service.js";
 import { safeEqualHex } from "./util/crypto.js";
 
@@ -19,14 +19,17 @@ function verifySignature(request: FastifyRequest): boolean {
   const sig = request.headers["x-hub-signature-256"];
   const raw = (request as FastifyRequest & { rawBody?: Buffer }).rawBody;
   if (typeof sig !== "string" || !raw) return false;
-  const expected = "sha256=" + createHmac("sha256", env.GITHUB_WEBHOOK_SECRET!).update(raw).digest("hex");
+  const expected =
+    "sha256=" + createHmac("sha256", env.GITHUB_WEBHOOK_SECRET!).update(raw).digest("hex");
   return safeEqualHex(sig, expected);
 }
 
 export function registerWebhook(app: FastifyInstance): void {
   app.post("/webhook", async (request, reply) => {
-    if (!githubConfigured) return reply.code(503).send({ ok: false, reason: "github_not_configured" });
-    if (!verifySignature(request)) return reply.code(401).send({ ok: false, reason: "bad_signature" });
+    if (!githubConfigured)
+      return reply.code(503).send({ ok: false, reason: "github_not_configured" });
+    if (!verifySignature(request))
+      return reply.code(401).send({ ok: false, reason: "bad_signature" });
 
     const event = request.headers["x-github-event"];
     const payload = request.body as Payload;

@@ -1,10 +1,10 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { installDbLifecycle, type DbHolder } from "../harness/setup-db.js";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { installations, jobs, pullRequests } from "../../src/db/schema.js";
 import { makeRepo } from "../harness/factories.js";
 import { signedWebhook, webhookSignature } from "../harness/http.js";
-import { installations, jobs, pullRequests } from "../../src/db/schema.js";
+import { type DbHolder, installDbLifecycle } from "../harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../../src/db/client.js", () => ({
@@ -80,7 +80,11 @@ describe("POST /webhook — signature gate", () => {
     const res = await app.inject({
       method: "POST",
       url: "/webhook",
-      headers: { "content-type": "application/json", "x-github-event": "ping", "x-hub-signature-256": "sha256=deadbeef" },
+      headers: {
+        "content-type": "application/json",
+        "x-github-event": "ping",
+        "x-hub-signature-256": "sha256=deadbeef",
+      },
       payload: JSON.stringify({ hello: "world" }),
     });
     expect(res.statusCode).toBe(401);
@@ -98,7 +102,11 @@ describe("POST /webhook — signature gate", () => {
   });
 
   it("accepts a correctly-signed but unhandled event", async () => {
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("ping", { zen: "hi" }) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("ping", { zen: "hi" }),
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
   });
@@ -109,7 +117,11 @@ describe("POST /webhook — signature gate", () => {
   });
 
   it("401 when signed with the wrong secret (proves the secret is actually checked)", async () => {
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("ping", { zen: "hi" }, "the-wrong-secret") });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("ping", { zen: "hi" }, "the-wrong-secret"),
+    });
     expect(res.statusCode).toBe(401);
     expect(res.json().reason).toBe("bad_signature");
   });
@@ -133,7 +145,11 @@ describe("POST /webhook — signature gate", () => {
 
 describe("POST /webhook — pull_request", () => {
   it("ignores an event for a repo that is not connected", async () => {
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("pull_request", prPayload(999999)) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("pull_request", prPayload(999999)),
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().ignored).toBe("repo_not_connected");
   });
@@ -152,7 +168,10 @@ describe("POST /webhook — pull_request", () => {
     expect(jobRows).toHaveLength(1);
     expect(jobRows[0].trigger).toBe("auto");
 
-    const prRows = await holder.db.select().from(pullRequests).where(eq(pullRequests.repoId, repo.id));
+    const prRows = await holder.db
+      .select()
+      .from(pullRequests)
+      .where(eq(pullRequests.repoId, repo.id));
     expect(prRows).toHaveLength(1);
     expect(prRows[0].number).toBe(5);
     // SHAs came from the payload — GitHub was not queried.
@@ -169,7 +188,10 @@ describe("POST /webhook — pull_request", () => {
     expect(res.json().ignored).toBe("auto_review_off");
     const jobRows = await holder.db.select().from(jobs).where(eq(jobs.repoId, repo.id));
     expect(jobRows).toHaveLength(0);
-    const prRows = await holder.db.select().from(pullRequests).where(eq(pullRequests.repoId, repo.id));
+    const prRows = await holder.db
+      .select()
+      .from(pullRequests)
+      .where(eq(pullRequests.repoId, repo.id));
     expect(prRows).toHaveLength(1);
   });
 
@@ -206,9 +228,20 @@ describe("POST /webhook — pull_request", () => {
     await app.inject({
       method: "POST",
       url: "/webhook",
-      ...signedWebhook("pull_request", prPayload(repo.githubRepoId, { number: 8, action: "closed", state: "closed", merged: true })),
+      ...signedWebhook(
+        "pull_request",
+        prPayload(repo.githubRepoId, {
+          number: 8,
+          action: "closed",
+          state: "closed",
+          merged: true,
+        }),
+      ),
     });
-    const [pr] = await holder.db.select().from(pullRequests).where(eq(pullRequests.repoId, repo.id));
+    const [pr] = await holder.db
+      .select()
+      .from(pullRequests)
+      .where(eq(pullRequests.repoId, repo.id));
     expect(pr.state).toBe("merged");
   });
 });
@@ -222,7 +255,11 @@ describe("POST /webhook — issue_comment /review command", () => {
       issue: { number: 12, pull_request: { url: "x" } },
       comment: { body: "/review please", user: { login: "testuser" } },
     };
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("issue_comment", payload) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("issue_comment", payload),
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().status).toBe("queued");
     // command path resolves SHAs from GitHub
@@ -239,7 +276,11 @@ describe("POST /webhook — issue_comment /review command", () => {
       issue: { number: 13, pull_request: { url: "x" } },
       comment: { body: "/review", user: { login: "stranger" } },
     };
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("issue_comment", payload) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("issue_comment", payload),
+    });
     expect(res.json().ignored).toBe("commenter_not_allowed");
   });
 
@@ -251,7 +292,11 @@ describe("POST /webhook — issue_comment /review command", () => {
       issue: { number: 14, pull_request: { url: "x" } },
       comment: { body: "looks good to me", user: { login: "testuser" } },
     };
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("issue_comment", payload) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("issue_comment", payload),
+    });
     expect(res.json().ignored).toBe("no_command");
   });
 
@@ -262,7 +307,11 @@ describe("POST /webhook — issue_comment /review command", () => {
       issue: { number: 15 }, // no pull_request
       comment: { body: "/review", user: { login: "testuser" } },
     };
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("issue_comment", payload) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("issue_comment", payload),
+    });
     expect(res.json().ignored).toBe("not_a_pr");
   });
 });
@@ -273,7 +322,11 @@ describe("POST /webhook — installation", () => {
       action: "created",
       installation: { id: 424242, account: { login: "octo-org" }, repository_selection: "all" },
     };
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("installation", payload) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("installation", payload),
+    });
     expect(res.statusCode).toBe(200);
     expect(syncInstallationRepos).toHaveBeenCalledWith(424242);
     const [inst] = await holder.db.select().from(installations).where(eq(installations.id, 424242));
@@ -283,7 +336,11 @@ describe("POST /webhook — installation", () => {
   it("removes the installation on 'deleted'", async () => {
     await holder.db.insert(installations).values({ id: 555, accountLogin: "gone" });
     const payload = { action: "deleted", installation: { id: 555, account: { login: "gone" } } };
-    const res = await app.inject({ method: "POST", url: "/webhook", ...signedWebhook("installation", payload) });
+    const res = await app.inject({
+      method: "POST",
+      url: "/webhook",
+      ...signedWebhook("installation", payload),
+    });
     expect(res.statusCode).toBe(200);
     const rows = await holder.db.select().from(installations).where(eq(installations.id, 555));
     expect(rows).toHaveLength(0);

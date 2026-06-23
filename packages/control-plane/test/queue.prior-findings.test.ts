@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
 import { makeFinding, makeJob, makeRepo, makeReview } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -26,15 +26,25 @@ describe("priorFindingsForPr", () => {
     const job1 = await makeJob(holder.db, { repoId: repo.id, prNumber: 7, round: 1 });
     const job2 = await makeJob(holder.db, { repoId: repo.id, prNumber: 7, round: 2 });
 
-    const review1 = await makeReview(holder.db, job1.id, { createdAt: new Date("2026-01-01T00:00:00Z") });
-    const review2 = await makeReview(holder.db, job2.id, { createdAt: new Date("2026-01-02T00:00:00Z") });
+    const review1 = await makeReview(holder.db, job1.id, {
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+    });
+    const review2 = await makeReview(holder.db, job2.id, {
+      createdAt: new Date("2026-01-02T00:00:00Z"),
+    });
 
     await makeFinding(holder.db, review2.id, { title: "second", path: "b.ts", line: null });
     await makeFinding(holder.db, review1.id, { title: "first", path: "a.ts", line: 3 });
 
     const prior = await priorFindingsForPr(repo.id, 7);
     expect(prior.map((p) => p.title)).toEqual(["first", "second"]);
-    expect(prior[0]).toEqual({ path: "a.ts", line: 3, severity: "medium", title: "first", body: "body" });
+    expect(prior[0]).toEqual({
+      path: "a.ts",
+      line: 3,
+      severity: "medium",
+      title: "first",
+      body: "body",
+    });
     expect(prior[1]!.line).toBeNull();
   });
 

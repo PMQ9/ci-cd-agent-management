@@ -1,7 +1,7 @@
 import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { LeaseJob } from "@agentpr/shared";
-import { prepareCheckout, type Checkout } from "./checkout.js";
+import { type Checkout, prepareCheckout } from "./checkout.js";
 import { ControlPlaneClient } from "./client.js";
 import { env } from "./config.js";
 import { loadCreds, saveCreds } from "./creds.js";
@@ -85,7 +85,12 @@ export async function handleJob(client: ControlPlaneClient, job: LeaseJob): Prom
     const message = err instanceof Error ? err.message : String(err);
     log(`FAILED ${job.jobId}: ${message}`);
     try {
-      await client.reportError({ leaseId: job.leaseId, message, totalCostUsd: null, wallMs: Date.now() - started });
+      await client.reportError({
+        leaseId: job.leaseId,
+        message,
+        totalCostUsd: null,
+        wallMs: Date.now() - started,
+      });
     } catch (reportErr) {
       log(`could not report error for ${job.jobId}:`, reportErr);
     }

@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { installDbLifecycle, type DbHolder } from "../harness/setup-db.js";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { makeJob, makeRepo, makeRunner } from "../harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "../harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../../src/db/client.js", () => ({

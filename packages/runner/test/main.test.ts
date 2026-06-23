@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaseJob } from "@agentpr/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // main.ts now exports handleJob/ensureEnrolled/main and only starts the poll loop
 // when run as the process entrypoint, so importing it here has no side effects.
@@ -76,7 +76,10 @@ describe("handleJob", () => {
     expect(prepareCheckout).toHaveBeenCalledOnce();
     expect(runClaudeReview).toHaveBeenCalledOnce();
     // the assembled instruction from the control plane is forwarded to the agent
-    expect(runClaudeReview.mock.calls[0][0]).toMatchObject({ reviewInstruction: "do the review", diff: "some diff" });
+    expect(runClaudeReview.mock.calls[0][0]).toMatchObject({
+      reviewInstruction: "do the review",
+      diff: "some diff",
+    });
 
     expect(client.reportResult).toHaveBeenCalledOnce();
     const reported = client.reportResult.mock.calls[0][0];
@@ -116,7 +119,10 @@ describe("handleJob", () => {
 
     expect(client.reportResult).not.toHaveBeenCalled();
     expect(client.reportError).toHaveBeenCalledOnce();
-    expect(client.reportError.mock.calls[0][0]).toMatchObject({ leaseId: "lease-1", message: "agent timed out" });
+    expect(client.reportError.mock.calls[0][0]).toMatchObject({
+      leaseId: "lease-1",
+      message: "agent timed out",
+    });
     expect(cleanup).toHaveBeenCalledOnce();
   });
 

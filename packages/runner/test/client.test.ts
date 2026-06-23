@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JobError, JobResult } from "@agentpr/shared";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControlPlaneClient } from "../src/client.js";
 
 const fetchMock = vi.fn();
@@ -103,7 +103,11 @@ describe("ControlPlaneClient.enroll", () => {
     fetchMock.mockResolvedValue(jsonResponse({ runnerId: "not-a-uuid", runnerToken: "t" }));
     const client = new ControlPlaneClient(BASE);
     await expect(
-      client.enroll({ enrollmentSecret: "s", name: "n", capabilities: { providers: ["claude_code"] } }),
+      client.enroll({
+        enrollmentSecret: "s",
+        name: "n",
+        capabilities: { providers: ["claude_code"] },
+      }),
     ).rejects.toThrow();
   });
 });

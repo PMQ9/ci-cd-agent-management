@@ -13,7 +13,10 @@ const UpdateTemplateSchema = z.object({
 
 export function registerTemplateRoutes(app: FastifyInstance): void {
   app.get("/api/templates", { preHandler: requireUser }, async () => {
-    const rows = await db.select().from(templates).orderBy(asc(templates.kind), asc(templates.name));
+    const rows = await db
+      .select()
+      .from(templates)
+      .orderBy(asc(templates.kind), asc(templates.name));
     return rows.map((t) => ({
       id: t.id,
       slug: t.slug,
@@ -34,8 +37,15 @@ export function registerTemplateRoutes(app: FastifyInstance): void {
       if (!parsed.success) {
         return reply.code(400).send({ error: { code: "bad_request", message: "Invalid update" } });
       }
-      const [row] = await db.select().from(templates).where(eq(templates.id, request.params.id)).limit(1);
-      if (!row) return reply.code(404).send({ error: { code: "not_found", message: "Template not found" } });
+      const [row] = await db
+        .select()
+        .from(templates)
+        .where(eq(templates.id, request.params.id))
+        .limit(1);
+      if (!row)
+        return reply
+          .code(404)
+          .send({ error: { code: "not_found", message: "Template not found" } });
 
       await db.transaction(async (tx) => {
         // Activating a pr_review template demotes the other pr_review rows first — the

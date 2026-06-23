@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
+import { describe, expect, it, vi } from "vitest";
 import { agentPrompts, templates } from "../src/db/schema.js";
 import { SEED_PROMPTS, SEED_TEMPLATES } from "../src/seed-data.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -60,7 +60,10 @@ describe("seedDefaults", () => {
     await seedDefaults();
 
     const [tpl] = await holder.db.select().from(templates).where(eq(templates.slug, seedSlug));
-    const [prompt] = await holder.db.select().from(agentPrompts).where(eq(agentPrompts.key, seedKey));
+    const [prompt] = await holder.db
+      .select()
+      .from(agentPrompts)
+      .where(eq(agentPrompts.key, seedKey));
     expect(tpl.content).toBe("EDITED CONTENT");
     expect(prompt.content).toBe("EDITED PROMPT");
   });

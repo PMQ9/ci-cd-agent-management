@@ -64,12 +64,12 @@ describe("extractModel", () => {
 
 describe("extractJsonObject", () => {
   it("strips a ```json fenced block and parses the inner object", () => {
-    const text = "```json\n{\"verdict\":\"approve\",\"summary\":\"ok\"}\n```";
+    const text = '```json\n{"verdict":"approve","summary":"ok"}\n```';
     expect(extractJsonObject(text)).toEqual({ verdict: "approve", summary: "ok" });
   });
 
   it("strips a plain ``` fenced block (no json hint)", () => {
-    const text = "```\n{\"a\":1}\n```";
+    const text = '```\n{"a":1}\n```';
     expect(extractJsonObject(text)).toEqual({ a: 1 });
   });
 

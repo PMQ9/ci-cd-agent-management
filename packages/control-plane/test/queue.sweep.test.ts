@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
-import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { describe, expect, it, vi } from "vitest";
 import { jobs } from "../src/db/schema.js";
+import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -55,7 +55,11 @@ describe("sweepExpiredLeases", () => {
       leaseExpiresAt: future,
     });
     const queued = await makeJob(holder.db, { repoId: repo.id, prNumber: 2, state: "queued" });
-    const succeeded = await makeJob(holder.db, { repoId: repo.id, prNumber: 3, state: "succeeded" });
+    const succeeded = await makeJob(holder.db, {
+      repoId: repo.id,
+      prNumber: 3,
+      state: "succeeded",
+    });
 
     const count = await sweepExpiredLeases();
     expect(count).toBe(0);

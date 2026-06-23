@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
-import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { describe, expect, it, vi } from "vitest";
 import { jobs, usageEvents } from "../src/db/schema.js";
+import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -30,7 +30,11 @@ describe("recordError", () => {
   it("inserts a usage event when costUsd > 0", async () => {
     const repo = await makeRepo(holder.db);
     const runner = await makeRunner(holder.db);
-    const job = await makeJob(holder.db, { repoId: repo.id, state: "leased", leasedByRunner: runner.id });
+    const job = await makeJob(holder.db, {
+      repoId: repo.id,
+      state: "leased",
+      leasedByRunner: runner.id,
+    });
     await recordError(job, "partial then failed", 0.0501, 999);
     const usage = await holder.db.select().from(usageEvents).where(eq(usageEvents.jobId, job.id));
     expect(usage).toHaveLength(1);

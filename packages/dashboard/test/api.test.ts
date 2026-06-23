@@ -6,11 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthError, api } from "../src/api.js";
 
 // A fetch stub that records the call args and returns a configurable Response-like.
-function makeFetch(opts: {
-  status?: number;
-  ok?: boolean;
-  json?: unknown;
-}) {
+function makeFetch(opts: { status?: number; ok?: boolean; json?: unknown }) {
   const status = opts.status ?? 200;
   const ok = opts.ok ?? (status >= 200 && status < 300);
   return vi.fn(async () => ({
@@ -35,9 +31,7 @@ describe("req — request shape", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.credentials).toBe("include");
-    expect((init.headers as Record<string, string>)["content-type"]).toBe(
-      "application/json",
-    );
+    expect((init.headers as Record<string, string>)["content-type"]).toBe("application/json");
   });
 
   it("preserves the content-type header even when the caller passes a method + body", async () => {
@@ -48,9 +42,7 @@ describe("req — request shape", () => {
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.credentials).toBe("include");
-    expect((init.headers as Record<string, string>)["content-type"]).toBe(
-      "application/json",
-    );
+    expect((init.headers as Record<string, string>)["content-type"]).toBe("application/json");
     expect(init.method).toBe("PATCH");
   });
 });

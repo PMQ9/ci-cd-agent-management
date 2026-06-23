@@ -1,16 +1,16 @@
-import { describe, it, expect } from "vitest";
 import {
   AgentFindingSchema,
-  PriorFindingSchema,
-  ReviewOutputSchema,
+  ApiErrorSchema,
   EnrollRequestSchema,
   EnrollResponseSchema,
+  JobErrorSchema,
+  JobResultSchema,
   LeaseJobSchema,
   LeaseResponseSchema,
-  JobResultSchema,
-  JobErrorSchema,
-  ApiErrorSchema,
+  PriorFindingSchema,
+  ReviewOutputSchema,
 } from "@agentpr/shared";
+import { describe, expect, it } from "vitest";
 
 // A real RFC-4122 v4 uuid for fields the schema validates with .uuid().
 const UUID = "123e4567-e89b-42d3-a456-426614174000";
@@ -60,16 +60,12 @@ describe("AgentFindingSchema", () => {
   });
 
   it("REJECTS an invalid severity", () => {
-    expect(
-      AgentFindingSchema.safeParse({ ...base, severity: "blocker" }).success,
-    ).toBe(false);
+    expect(AgentFindingSchema.safeParse({ ...base, severity: "blocker" }).success).toBe(false);
   });
 
   it("accepts every valid severity", () => {
     for (const sev of ["critical", "high", "medium", "low", "info"]) {
-      expect(AgentFindingSchema.safeParse({ ...base, severity: sev }).success).toBe(
-        true,
-      );
+      expect(AgentFindingSchema.safeParse({ ...base, severity: sev }).success).toBe(true);
     }
   });
 
@@ -77,10 +73,9 @@ describe("AgentFindingSchema", () => {
     for (const key of ["path", "severity", "title", "body"]) {
       const partial: Record<string, unknown> = { ...base };
       delete partial[key];
-      expect(
-        AgentFindingSchema.safeParse(partial).success,
-        `missing "${key}" should reject`,
-      ).toBe(false);
+      expect(AgentFindingSchema.safeParse(partial).success, `missing "${key}" should reject`).toBe(
+        false,
+      );
     }
     // line is required too (it is nullable but not optional)
     const noLine: Record<string, unknown> = { ...base };
@@ -128,15 +123,11 @@ describe("PriorFindingSchema (line is .int().nullable(), NOT .positive())", () =
   });
 
   it("allows empty title/body (no .min(1) constraint, unlike AgentFinding)", () => {
-    expect(
-      PriorFindingSchema.safeParse({ ...base, title: "", body: "" }).success,
-    ).toBe(true);
+    expect(PriorFindingSchema.safeParse({ ...base, title: "", body: "" }).success).toBe(true);
   });
 
   it("REJECTS an invalid severity", () => {
-    expect(
-      PriorFindingSchema.safeParse({ ...base, severity: "nope" }).success,
-    ).toBe(false);
+    expect(PriorFindingSchema.safeParse({ ...base, severity: "nope" }).success).toBe(false);
   });
 });
 
@@ -276,9 +267,7 @@ describe("EnrollRequestSchema", () => {
   });
 
   it("REJECTS an empty enrollmentSecret", () => {
-    expect(
-      EnrollRequestSchema.safeParse({ ...base, enrollmentSecret: "" }).success,
-    ).toBe(false);
+    expect(EnrollRequestSchema.safeParse({ ...base, enrollmentSecret: "" }).success).toBe(false);
   });
 
   it("REJECTS an invalid provider", () => {
@@ -294,22 +283,19 @@ describe("EnrollRequestSchema", () => {
 // ── EnrollResponseSchema ───────────────────────────────────────────────────────
 describe("EnrollResponseSchema", () => {
   it("accepts a uuid runnerId + non-empty token", () => {
-    expect(
-      EnrollResponseSchema.safeParse({ runnerId: UUID, runnerToken: "tok" }).success,
-    ).toBe(true);
+    expect(EnrollResponseSchema.safeParse({ runnerId: UUID, runnerToken: "tok" }).success).toBe(
+      true,
+    );
   });
 
   it("REJECTS a non-uuid runnerId", () => {
     expect(
-      EnrollResponseSchema.safeParse({ runnerId: "not-a-uuid", runnerToken: "tok" })
-        .success,
+      EnrollResponseSchema.safeParse({ runnerId: "not-a-uuid", runnerToken: "tok" }).success,
     ).toBe(false);
   });
 
   it("REJECTS an empty runnerToken (.min(1))", () => {
-    expect(
-      EnrollResponseSchema.safeParse({ runnerId: UUID, runnerToken: "" }).success,
-    ).toBe(false);
+    expect(EnrollResponseSchema.safeParse({ runnerId: UUID, runnerToken: "" }).success).toBe(false);
   });
 });
 
@@ -344,24 +330,16 @@ describe("LeaseJobSchema", () => {
   });
 
   it("REJECTS reviewInstruction=null (.string().optional(), NOT nullable)", () => {
-    expect(
-      LeaseJobSchema.safeParse({ ...base, reviewInstruction: null }).success,
-    ).toBe(false);
+    expect(LeaseJobSchema.safeParse({ ...base, reviewInstruction: null }).success).toBe(false);
   });
 
   it("REJECTS a non-URL cloneUrl", () => {
-    expect(
-      LeaseJobSchema.safeParse({ ...base, cloneUrl: "not a url" }).success,
-    ).toBe(false);
+    expect(LeaseJobSchema.safeParse({ ...base, cloneUrl: "not a url" }).success).toBe(false);
   });
 
   it("accepts resumeSessionId=null and a string", () => {
-    expect(LeaseJobSchema.safeParse({ ...base, resumeSessionId: null }).success).toBe(
-      true,
-    );
-    expect(
-      LeaseJobSchema.safeParse({ ...base, resumeSessionId: "sess-1" }).success,
-    ).toBe(true);
+    expect(LeaseJobSchema.safeParse({ ...base, resumeSessionId: null }).success).toBe(true);
+    expect(LeaseJobSchema.safeParse({ ...base, resumeSessionId: "sess-1" }).success).toBe(true);
   });
 
   it("accepts model=null", () => {
@@ -369,9 +347,7 @@ describe("LeaseJobSchema", () => {
   });
 
   it("REJECTS an invalid provider enum", () => {
-    expect(LeaseJobSchema.safeParse({ ...base, provider: "bedrock" }).success).toBe(
-      false,
-    );
+    expect(LeaseJobSchema.safeParse({ ...base, provider: "bedrock" }).success).toBe(false);
   });
 
   it("REJECTS a non-uuid jobId / leaseId", () => {
@@ -387,9 +363,7 @@ describe("LeaseJobSchema", () => {
       title: "t",
       body: "b",
     };
-    expect(
-      LeaseJobSchema.safeParse({ ...base, priorFindings: [goodPrior] }).success,
-    ).toBe(true);
+    expect(LeaseJobSchema.safeParse({ ...base, priorFindings: [goodPrior] }).success).toBe(true);
     expect(
       LeaseJobSchema.safeParse({
         ...base,
@@ -447,9 +421,7 @@ describe("JobResultSchema", () => {
   });
 
   it("REJECTS a negative totalCostUsd (.nonnegative())", () => {
-    expect(JobResultSchema.safeParse({ ...base, totalCostUsd: -0.01 }).success).toBe(
-      false,
-    );
+    expect(JobResultSchema.safeParse({ ...base, totalCostUsd: -0.01 }).success).toBe(false);
   });
 
   it("accepts totalCostUsd=0 (nonnegative boundary)", () => {
@@ -458,31 +430,24 @@ describe("JobResultSchema", () => {
 
   it("accepts inputTokens/outputTokens = null (nullable)", () => {
     expect(
-      JobResultSchema.safeParse({ ...base, inputTokens: null, outputTokens: null })
-        .success,
+      JobResultSchema.safeParse({ ...base, inputTokens: null, outputTokens: null }).success,
     ).toBe(true);
   });
 
   it("REJECTS negative inputTokens / outputTokens", () => {
     expect(JobResultSchema.safeParse({ ...base, inputTokens: -1 }).success).toBe(false);
-    expect(JobResultSchema.safeParse({ ...base, outputTokens: -1 }).success).toBe(
-      false,
-    );
+    expect(JobResultSchema.safeParse({ ...base, outputTokens: -1 }).success).toBe(false);
   });
 
   it("REJECTS float inputTokens / outputTokens (must be .int())", () => {
-    expect(JobResultSchema.safeParse({ ...base, inputTokens: 1.5 }).success).toBe(
-      false,
-    );
-    expect(JobResultSchema.safeParse({ ...base, outputTokens: 1.5 }).success).toBe(
-      false,
-    );
+    expect(JobResultSchema.safeParse({ ...base, inputTokens: 1.5 }).success).toBe(false);
+    expect(JobResultSchema.safeParse({ ...base, outputTokens: 1.5 }).success).toBe(false);
   });
 
   it("accepts inputTokens/outputTokens = 0", () => {
-    expect(
-      JobResultSchema.safeParse({ ...base, inputTokens: 0, outputTokens: 0 }).success,
-    ).toBe(true);
+    expect(JobResultSchema.safeParse({ ...base, inputTokens: 0, outputTokens: 0 }).success).toBe(
+      true,
+    );
   });
 
   it("requires wallMs to be a nonnegative integer", () => {
@@ -526,9 +491,9 @@ describe("JobErrorSchema", () => {
   });
 
   it("accepts a nonnegative numeric totalCostUsd and integer wallMs", () => {
-    expect(
-      JobErrorSchema.safeParse({ ...base, totalCostUsd: 0.5, wallMs: 100 }).success,
-    ).toBe(true);
+    expect(JobErrorSchema.safeParse({ ...base, totalCostUsd: 0.5, wallMs: 100 }).success).toBe(
+      true,
+    );
   });
 
   it("REJECTS a negative totalCostUsd (.nonnegative())", () => {
@@ -553,9 +518,9 @@ describe("JobErrorSchema", () => {
 // ── ApiErrorSchema ─────────────────────────────────────────────────────────────
 describe("ApiErrorSchema", () => {
   it("accepts { error: { code, message } } with fields omitted", () => {
-    expect(
-      ApiErrorSchema.safeParse({ error: { code: "BAD", message: "nope" } }).success,
-    ).toBe(true);
+    expect(ApiErrorSchema.safeParse({ error: { code: "BAD", message: "nope" } }).success).toBe(
+      true,
+    );
   });
 
   it("accepts an optional fields record of string→string", () => {

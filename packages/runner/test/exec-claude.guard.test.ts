@@ -11,7 +11,12 @@ const { runClaudeReview } = await import("../src/exec-claude.js");
 
 // Build a fake ChildProcess that spawnCollect can consume: stdout/stderr are
 // EventEmitters, stdin has write/end, and .on("close") drives completion.
-function makeFakeChild(opts: { stdout?: string; stderr?: string; exitCode?: number; emitError?: Error }) {
+function makeFakeChild(opts: {
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  emitError?: Error;
+}) {
   const child = new EventEmitter() as any;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
@@ -74,9 +79,9 @@ afterEach(() => {
 describe("runClaudeReview — ANTHROPIC_API_KEY guard (the load-bearing negative test)", () => {
   it("REFUSES to run when ANTHROPIC_API_KEY is set, mentions billing/subscription, and NEVER spawns", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
-    await expect(
-      runClaudeReview({ ...minimalOpts, diff: "some diff" }),
-    ).rejects.toThrow(/bill|subscription/i);
+    await expect(runClaudeReview({ ...minimalOpts, diff: "some diff" })).rejects.toThrow(
+      /bill|subscription/i,
+    );
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
@@ -84,7 +89,9 @@ describe("runClaudeReview — ANTHROPIC_API_KEY guard (the load-bearing negative
     // Regression guard: if the empty-diff return were ordered before the API-key
     // check, an empty-diff job with a stray key would silently skip the refusal.
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
-    await expect(runClaudeReview({ ...minimalOpts, diff: "" })).rejects.toThrow(/bill|subscription/i);
+    await expect(runClaudeReview({ ...minimalOpts, diff: "" })).rejects.toThrow(
+      /bill|subscription/i,
+    );
     expect(spawnMock).not.toHaveBeenCalled();
   });
 });
@@ -164,7 +171,12 @@ describe("runClaudeReview — argv construction & happy path (spawn mocked)", ()
   it("appends --model when opts.model is set", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     spawnMock.mockImplementation(() => makeFakeChild({ stdout: wrapperStdout(), exitCode: 0 }));
-    await runClaudeReview({ ...minimalOpts, diff: "d", model: "claude-3-5-sonnet", reviewInstruction: "x" });
+    await runClaudeReview({
+      ...minimalOpts,
+      diff: "d",
+      model: "claude-3-5-sonnet",
+      reviewInstruction: "x",
+    });
     const [, args] = spawnMock.mock.calls[0]!;
     const i = args.indexOf("--model");
     expect(i).toBeGreaterThan(-1);
@@ -174,7 +186,12 @@ describe("runClaudeReview — argv construction & happy path (spawn mocked)", ()
   it("appends --resume when opts.resumeSessionId is set", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     spawnMock.mockImplementation(() => makeFakeChild({ stdout: wrapperStdout(), exitCode: 0 }));
-    await runClaudeReview({ ...minimalOpts, diff: "d", resumeSessionId: "resume-abc", reviewInstruction: "x" });
+    await runClaudeReview({
+      ...minimalOpts,
+      diff: "d",
+      resumeSessionId: "resume-abc",
+      reviewInstruction: "x",
+    });
     const [, args] = spawnMock.mock.calls[0]!;
     const i = args.indexOf("--resume");
     expect(i).toBeGreaterThan(-1);

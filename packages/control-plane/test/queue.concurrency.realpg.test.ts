@@ -32,7 +32,9 @@ describe.skipIf(!RUN)("leaseNextJob concurrency — FOR UPDATE SKIP LOCKED (real
 
   it("never leases the same job twice when many runners race for fewer jobs", async () => {
     const repo = await makeRepo(holder.current.db);
-    const runners = await Promise.all(Array.from({ length: 8 }, () => makeRunner(holder.current.db)));
+    const runners = await Promise.all(
+      Array.from({ length: 8 }, () => makeRunner(holder.current.db)),
+    );
 
     const JOB_COUNT = 5;
     for (let i = 0; i < JOB_COUNT; i++) {
@@ -102,7 +104,9 @@ describe.skipIf(!RUN)("leaseNextJob concurrency — FOR UPDATE SKIP LOCKED (real
 
   it("hands every job to exactly one runner when runners == jobs", async () => {
     const repo = await makeRepo(holder.current.db);
-    const runners = await Promise.all(Array.from({ length: 6 }, () => makeRunner(holder.current.db)));
+    const runners = await Promise.all(
+      Array.from({ length: 6 }, () => makeRunner(holder.current.db)),
+    );
     for (let i = 0; i < runners.length; i++) {
       await enqueueReview({
         repoId: repo.id,

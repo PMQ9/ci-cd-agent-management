@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
 import type { JobResult } from "@agentpr/shared";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
-import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { eq } from "drizzle-orm";
+import { describe, expect, it, vi } from "vitest";
 import { findings, jobs, reviews, usageEvents } from "../src/db/schema.js";
+import { makeJob, makeRepo, makeRunner } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -67,7 +67,10 @@ describe("persistResult", () => {
     expect(review.concerns).toEqual(["is this intended?"]);
     expect(review.suggestedFixes).toEqual(["do X", "do Y"]);
 
-    const findingRows = await holder.db.select().from(findings).where(eq(findings.reviewId, out!.reviewId));
+    const findingRows = await holder.db
+      .select()
+      .from(findings)
+      .where(eq(findings.reviewId, out!.reviewId));
     expect(findingRows).toHaveLength(2);
     expect(findingRows.every((f: any) => f.status === "open")).toBe(true);
 
@@ -98,7 +101,11 @@ describe("persistResult", () => {
   it("re-persisting after success (re-fetched job, now succeeded) is a no-op — the route-level idempotency guard", async () => {
     const repo = await makeRepo(holder.db);
     const runner = await makeRunner(holder.db);
-    const job = await makeJob(holder.db, { repoId: repo.id, state: "leased", leasedByRunner: runner.id });
+    const job = await makeJob(holder.db, {
+      repoId: repo.id,
+      state: "leased",
+      leasedByRunner: runner.id,
+    });
 
     const first = await persistResult(job, baseResult());
     expect(first).not.toBeNull();
@@ -117,7 +124,10 @@ describe("persistResult", () => {
     const job = await makeJob(holder.db, { repoId: repo.id, state: "running" });
     const out = await persistResult(job, baseResult({ findings: [] }));
     expect(out).not.toBeNull();
-    const findingRows = await holder.db.select().from(findings).where(eq(findings.reviewId, out!.reviewId));
+    const findingRows = await holder.db
+      .select()
+      .from(findings)
+      .where(eq(findings.reviewId, out!.reviewId));
     expect(findingRows).toHaveLength(0);
     const usage = await holder.db.select().from(usageEvents).where(eq(usageEvents.jobId, job.id));
     expect(usage).toHaveLength(1);
@@ -134,7 +144,11 @@ describe("persistResult", () => {
 
   it("preserves the prior claudeSessionId when the result carries none", async () => {
     const repo = await makeRepo(holder.db);
-    const job = await makeJob(holder.db, { repoId: repo.id, state: "leased", claudeSessionId: "keep-me" });
+    const job = await makeJob(holder.db, {
+      repoId: repo.id,
+      state: "leased",
+      claudeSessionId: "keep-me",
+    });
     const out = await persistResult(job, baseResult({ sessionId: null }));
     expect(out).not.toBeNull();
     const [jobAfter] = await holder.db.select().from(jobs).where(eq(jobs.id, job.id));

@@ -2,11 +2,11 @@
 // private-mode resilience, and applySize's inline --font-size + persistence.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applySize,
   DEFAULT_SIZE,
+  getStoredSize,
   SIZE_OPTIONS,
   SIZE_STORAGE_KEY,
-  applySize,
-  getStoredSize,
 } from "../src/size.js";
 
 const VALID_IDS = SIZE_OPTIONS.map((o) => o.id);
@@ -47,8 +47,20 @@ describe("registry", () => {
 
   it("covers the inclusive 11..24 px range as string ids", () => {
     expect(VALID_IDS).toEqual([
-      "11", "12", "13", "14", "15", "16", "17",
-      "18", "19", "20", "21", "22", "23", "24",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
     ]);
     expect(SIZE_OPTIONS[0]).toEqual({ id: "11", label: "11px" });
     expect(SIZE_OPTIONS.at(-1)).toEqual({ id: "24", label: "24px" });
@@ -108,9 +120,7 @@ describe("getStoredSize", () => {
 describe("applySize", () => {
   it("sets the inline --font-size custom property on <html> with a px suffix", () => {
     applySize("20");
-    expect(
-      document.documentElement.style.getPropertyValue("--font-size"),
-    ).toBe("20px");
+    expect(document.documentElement.style.getPropertyValue("--font-size")).toBe("20px");
   });
 
   it("persists the bare id to localStorage under SIZE_STORAGE_KEY", () => {
@@ -130,8 +140,6 @@ describe("applySize", () => {
     setLocalStorage({ ...makeMemoryStorage(), setItem } as unknown as Storage);
     expect(() => applySize("22")).not.toThrow();
     expect(setItem).toHaveBeenCalled();
-    expect(
-      document.documentElement.style.getPropertyValue("--font-size"),
-    ).toBe("22px");
+    expect(document.documentElement.style.getPropertyValue("--font-size")).toBe("22px");
   });
 });

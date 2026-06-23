@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { installDbLifecycle, type DbHolder } from "./harness/setup-db.js";
-import { makeJob, makeRepo, makeRunner, makeUsageEvent } from "./harness/factories.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { jobs } from "../src/db/schema.js";
+import { makeJob, makeRepo, makeRunner, makeUsageEvent } from "./harness/factories.js";
+import { type DbHolder, installDbLifecycle } from "./harness/setup-db.js";
 
 const holder = vi.hoisted(() => ({}) as DbHolder);
 vi.mock("../src/db/client.js", () => ({
@@ -37,13 +37,25 @@ const SHAS = { headSha: "h".repeat(40), baseSha: "b".repeat(40) };
 describe("triggerReviewForPr", () => {
   it("skips when repo.fullName has no owner/name", async () => {
     const repo = await makeRepo(holder.db, { fullName: "noslash" });
-    const out = await triggerReviewForPr({ repo, prNumber: 1, trigger: "manual", ...SHAS, draftHint: false });
+    const out = await triggerReviewForPr({
+      repo,
+      prNumber: 1,
+      trigger: "manual",
+      ...SHAS,
+      draftHint: false,
+    });
     expect(out).toEqual({ status: "skipped", reason: "bad repo full_name" });
   });
 
   it("auto trigger on a draft PR is skipped and enqueues nothing", async () => {
     const repo = await makeRepo(holder.db);
-    const out = await triggerReviewForPr({ repo, prNumber: 1, trigger: "auto", ...SHAS, draftHint: true });
+    const out = await triggerReviewForPr({
+      repo,
+      prNumber: 1,
+      trigger: "auto",
+      ...SHAS,
+      draftHint: true,
+    });
     expect(out).toEqual({ status: "skipped", reason: "draft PR" });
     const jobsForPr = await holder.db
       .select()
@@ -56,7 +68,13 @@ describe("triggerReviewForPr", () => {
     const repo = await makeRepo(holder.db, { dailyCostCapUsd: "0.5" });
     const spendJob = await makeJob(holder.db, { repoId: repo.id, prNumber: 1 });
     await makeUsageEvent(holder.db, { jobId: spendJob.id, costUsd: "0.9000" });
-    const out = await triggerReviewForPr({ repo, prNumber: 2, trigger: "auto", ...SHAS, draftHint: false });
+    const out = await triggerReviewForPr({
+      repo,
+      prNumber: 2,
+      trigger: "auto",
+      ...SHAS,
+      draftHint: false,
+    });
     expect(out.status).toBe("skipped");
     expect((out as any).reason).toContain("cost cap");
     // No NEW job for the triggered PR (#2) — only the pre-existing spend job (#1) exists.
@@ -69,7 +87,13 @@ describe("triggerReviewForPr", () => {
 
   it("manual trigger runs even on a draft PR (user opted in)", async () => {
     const repo = await makeRepo(holder.db);
-    const out = await triggerReviewForPr({ repo, prNumber: 3, trigger: "manual", ...SHAS, draftHint: true });
+    const out = await triggerReviewForPr({
+      repo,
+      prNumber: 3,
+      trigger: "manual",
+      ...SHAS,
+      draftHint: true,
+    });
     expect(out.status).toBe("queued");
   });
 
@@ -77,16 +101,30 @@ describe("triggerReviewForPr", () => {
     const repo = await makeRepo(holder.db, { dailyCostCapUsd: "0.5" });
     const job = await makeJob(holder.db, { repoId: repo.id });
     await makeUsageEvent(holder.db, { jobId: job.id, costUsd: "0.9000" });
-    const out = await triggerReviewForPr({ repo, prNumber: 4, trigger: "command", ...SHAS, draftHint: false });
+    const out = await triggerReviewForPr({
+      repo,
+      prNumber: 4,
+      trigger: "command",
+      ...SHAS,
+      draftHint: false,
+    });
     expect(out.status).toBe("queued");
   });
 
   it("resolves SHAs from GitHub when not supplied, and uses them on the job", async () => {
     const repo = await makeRepo(holder.db);
     const out = await triggerReviewForPr({ repo, prNumber: 5, trigger: "manual" });
-    expect(getPrRefs).toHaveBeenCalledWith(repo.installationId, expect.any(String), expect.any(String), 5);
+    expect(getPrRefs).toHaveBeenCalledWith(
+      repo.installationId,
+      expect.any(String),
+      expect.any(String),
+      5,
+    );
     expect(out.status).toBe("queued");
-    const [job] = await holder.db.select().from(jobs).where(eq(jobs.id, (out as any).jobId));
+    const [job] = await holder.db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.id, (out as any).jobId));
     expect(job.headSha).toBe("ghhead".padEnd(40, "0"));
     expect(job.baseSha).toBe("ghbase".padEnd(40, "0"));
   });
@@ -110,9 +148,18 @@ describe("triggerReviewForPr", () => {
       claudeSessionId: "sess-xyz",
     });
 
-    const out = await triggerReviewForPr({ repo, prNumber: 7, trigger: "command", ...SHAS, draftHint: false });
+    const out = await triggerReviewForPr({
+      repo,
+      prNumber: 7,
+      trigger: "command",
+      ...SHAS,
+      draftHint: false,
+    });
     expect(out).toMatchObject({ status: "queued", round: 2 });
-    const [job] = await holder.db.select().from(jobs).where(eq(jobs.id, (out as any).jobId));
+    const [job] = await holder.db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.id, (out as any).jobId));
     expect(job.preferredRunnerId).toBe(runner.id);
     expect(job.claudeSessionId).toBe("sess-xyz");
   });

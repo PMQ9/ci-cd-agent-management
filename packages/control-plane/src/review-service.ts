@@ -1,12 +1,7 @@
 import type { TriggerSource } from "@agentpr/shared";
-import { getPrRefs } from "./github/app.js";
-import {
-  autoReviewBlockedReason,
-  enqueueReview,
-  getMaxRoundForPr,
-  lastJobForPr,
-} from "./queue.js";
 import type { RepoRow } from "./db/schema.js";
+import { getPrRefs } from "./github/app.js";
+import { autoReviewBlockedReason, enqueueReview, getMaxRoundForPr, lastJobForPr } from "./queue.js";
 
 export type TriggerOutcome =
   | { status: "queued"; jobId: string; round: number }
