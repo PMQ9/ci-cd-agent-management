@@ -175,7 +175,7 @@
     min-width: 0; /* allow this grid item to shrink below its content size (see .layout) */
   }
 
-  /* ---- theme switcher ---------------------------------------------------- */
+  /* ---- labeled-select controls (theme + size switchers) ----------------- */
   .theme-switch {
     display: flex;
     flex-direction: column;

@@ -14,6 +14,7 @@ import {
 } from "./api.js";
 import { Badge, JobBadge, Panel } from "./ui.js";
 import { ThemeSwitcher } from "./ThemeSwitcher.js";
+import { SizeSwitcher } from "./SizeSwitcher.js";
 
 type Tab = "repos" | "templates" | "prompts" | "pulls" | "runners" | "activity" | "usage";
 const TAB_LABELS: Record<Tab, string> = {
@@ -72,6 +73,7 @@ export function App() {
         </nav>
         <div className="sidebar-foot">
           <ThemeSwitcher />
+          <SizeSwitcher />
           <div className="user">
             <span className="dim">@{login}</span>
             <button
