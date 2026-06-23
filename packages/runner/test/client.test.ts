@@ -55,7 +55,7 @@ describe("ControlPlaneClient.post behavior (via public methods)", () => {
 
   it("omits Authorization on UN-authed requests (enroll) even when a token is set", async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ runnerId: "11111111-1111-1111-1111-111111111111", runnerToken: "t" }),
+      jsonResponse({ runnerId: "11111111-1111-4111-8111-111111111111", runnerToken: "t" }),
     );
     const client = new ControlPlaneClient(BASE, "preset-token");
     await client.enroll({
@@ -85,7 +85,7 @@ describe("ControlPlaneClient.post behavior (via public methods)", () => {
 
 describe("ControlPlaneClient.enroll", () => {
   it("POSTs to /api/runners/enroll and parses EnrollResponse", async () => {
-    const id = "22222222-2222-2222-2222-222222222222";
+    const id = "22222222-2222-4222-8222-222222222222";
     fetchMock.mockResolvedValue(jsonResponse({ runnerId: id, runnerToken: "durable-tok" }));
     const client = new ControlPlaneClient(BASE);
     const res = await client.enroll({
@@ -123,8 +123,8 @@ describe("ControlPlaneClient.lease", () => {
 
   it("parses a full LeaseJob job payload through the shared schema", async () => {
     const job = {
-      jobId: "33333333-3333-3333-3333-333333333333",
-      leaseId: "44444444-4444-4444-4444-444444444444",
+      jobId: "33333333-3333-4333-8333-333333333333",
+      leaseId: "44444444-4444-4444-8444-444444444444",
       repoFullName: "octocat/hello",
       cloneUrl: "https://github.com/octocat/hello.git",
       prNumber: 9,
@@ -164,7 +164,7 @@ describe("ControlPlaneClient.reportResult / reportError", () => {
     fetchMock.mockResolvedValue(jsonResponse({}, { ok: true }));
     const client = new ControlPlaneClient(BASE, "tok");
     const result: JobResult = {
-      leaseId: "55555555-5555-5555-5555-555555555555",
+      leaseId: "55555555-5555-4555-8555-555555555555",
       sessionId: "sess",
       verdict: "approve",
       summary: "ok",
@@ -189,7 +189,7 @@ describe("ControlPlaneClient.reportResult / reportError", () => {
     fetchMock.mockResolvedValue(jsonResponse({}, { ok: true }));
     const client = new ControlPlaneClient(BASE, "tok");
     const err: JobError = {
-      leaseId: "66666666-6666-6666-6666-666666666666",
+      leaseId: "66666666-6666-4666-8666-666666666666",
       message: "boom",
       totalCostUsd: null,
       wallMs: null,
@@ -207,7 +207,7 @@ describe("ControlPlaneClient.reportResult / reportError", () => {
     const client = new ControlPlaneClient(BASE, "tok");
     await expect(
       client.reportResult({
-        leaseId: "77777777-7777-7777-7777-777777777777",
+        leaseId: "77777777-7777-4777-8777-777777777777",
         sessionId: null,
         verdict: "comment",
         summary: "x",
