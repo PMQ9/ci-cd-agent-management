@@ -109,6 +109,21 @@
     padding: 1lh 1ch;
     background: var(--background1);
     border-right: 2px solid var(--background3);
+    /* Pin to the viewport. Without this the sidebar is a grid item that stretches to
+       the row height (= max(100vh, tallest column)); on the Review Templates / System
+       Prompts tabs the tall textareas blow .content past the fold, the sidebar stretches
+       with it, and .sidebar-foot's margin-top:auto parks the theme/size controls at the
+       bottom of the whole page instead of the viewport. sticky + a fixed viewport height
+       decouple the sidebar from the row so the foot sits at the viewport bottom on every
+       tab. height (not min-height) means overflow-y:auto is load-bearing: a sidebar
+       taller than the viewport scrolls internally rather than clipping the foot. Reset
+       in the <=760px top-bar block below — and keep ancestors overflow:visible or sticky
+       silently dies. */
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh; /* dvh avoids the mobile URL-bar clipping the foot; vh is the fallback */
+    overflow-y: auto;
   }
   .brand {
     font-weight: var(--font-weight-bold);
@@ -456,6 +471,12 @@
     .sidebar {
       border-right: none;
       border-bottom: 2px solid var(--background3);
+      /* Undo the desktop viewport-pin: as a horizontal top bar the sidebar must flow at
+         its natural height, not be a 100dvh sticky column that swallows the phone screen.
+         overflow-y must reset too, else the bar keeps a pointless nested scroll region. */
+      position: static;
+      height: auto;
+      overflow-y: visible;
     }
     .nav {
       flex-direction: row;
