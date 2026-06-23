@@ -59,7 +59,7 @@ updates:
           - minor
           - patch
 
-  # ── Dockerfile base image (node:22-slim) ──
+  # ── Dockerfile base image (node:24-slim) ──
   - package-ecosystem: docker
     directory: "/"
     schedule:
