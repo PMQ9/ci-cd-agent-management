@@ -11,6 +11,7 @@ import { registerRepoRoutes } from "./routes/repos.js";
 import { registerRunnerRoutes } from "./routes/runners.js";
 import { registerTemplateRoutes } from "./routes/templates.js";
 import { registerUsageRoutes } from "./routes/usage.js";
+import { registerVendorStatusRoutes } from "./routes/vendor-status.js";
 import { safeEqualHex } from "./util/crypto.js";
 import { registerWebhook } from "./webhook.js";
 
@@ -74,6 +75,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   registerUsageRoutes(app);
   registerTemplateRoutes(app);
   registerPromptRoutes(app);
+  registerVendorStatusRoutes(app);
 
   // Optionally serve the prebuilt dashboard from the same origin.
   if (env.DASHBOARD_DIST) {

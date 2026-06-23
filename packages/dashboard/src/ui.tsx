@@ -85,6 +85,26 @@ export function ReviewStatusBadge({
   );
 }
 
+// Vendor status level → badge tone + cap + label. Mirrors the JobBadge pattern.
+// Covers every shared VENDOR_STATUS_LEVELS value, with a neutral fallback.
+const VENDOR_STATUS: Record<string, { tone: Tone; cap?: string; label: string }> = {
+  operational: { tone: "green", cap: "round", label: "operational" },
+  degraded: { tone: "yellow", cap: "triangle", label: "degraded" },
+  partial_outage: { tone: "peach", cap: "triangle", label: "partial outage" },
+  major_outage: { tone: "red", cap: "ribbon", label: "major outage" },
+  maintenance: { tone: "blue", cap: "slant-top", label: "maintenance" },
+  unknown: { tone: "neutral", label: "unknown" },
+};
+
+export function VendorStatusBadge({ level }: { level: string }) {
+  const m = VENDOR_STATUS[level] ?? { tone: "neutral" as Tone, label: level };
+  return (
+    <Badge tone={m.tone} cap={m.cap}>
+      {m.label}
+    </Badge>
+  );
+}
+
 /** A bordered panel with its title sitting on the top border line (TUI "legend" look). */
 export function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (

@@ -141,6 +141,48 @@ export const JobErrorSchema = z.object({
 });
 export type JobError = z.infer<typeof JobErrorSchema>;
 
+// ── Vendor / AI-service status (external monitoring) ───────────────────────────
+// The normalized shape the control plane derives from each vendor's Atlassian
+// Statuspage `summary.json`. `level` is our own bucket; `indicator` keeps the raw
+// Statuspage value for debugging. `ok=false` means the fetch itself failed, so
+// `level` is "unknown" rather than a real status.
+export const VENDOR_STATUS_LEVELS = [
+  "operational",
+  "degraded",
+  "partial_outage",
+  "major_outage",
+  "maintenance",
+  "unknown",
+] as const;
+
+export const VendorIncidentSchema = z.object({
+  name: z.string(),
+  impact: z.string(), // none | minor | major | critical
+  status: z.string(), // investigating | identified | monitoring | ...
+  shortlink: z.string().optional(),
+  updatedAt: z.string().nullable(),
+});
+export type VendorIncident = z.infer<typeof VendorIncidentSchema>;
+
+export const VendorStatusSchema = z.object({
+  key: z.string(), // "claude" | "github" | "cloudflare" | "openai"
+  name: z.string(), // "Claude"
+  statusPageUrl: z.string(), // human-facing status page link
+  level: z.enum(VENDOR_STATUS_LEVELS),
+  description: z.string(), // "All Systems Operational" | "Status unavailable"
+  indicator: z.string().nullable(), // raw Statuspage indicator (debug)
+  updatedAt: z.string().nullable(), // page.updated_at
+  incidents: z.array(VendorIncidentSchema),
+  ok: z.boolean(), // false when the fetch failed (level "unknown")
+});
+export type VendorStatus = z.infer<typeof VendorStatusSchema>;
+
+export const VendorStatusResponseSchema = z.object({
+  fetchedAt: z.string(),
+  vendors: z.array(VendorStatusSchema),
+});
+export type VendorStatusResponse = z.infer<typeof VendorStatusResponseSchema>;
+
 // ── Generic API error envelope (consistent across every endpoint) ──────────────
 export const ApiErrorSchema = z.object({
   error: z.object({
