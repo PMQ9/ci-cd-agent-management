@@ -85,6 +85,39 @@ export interface AgentPromptDTO {
   updatedAt: string | null;
 }
 
+export interface VendorIncidentDTO {
+  name: string;
+  impact: string;
+  status: string;
+  shortlink?: string;
+  updatedAt: string | null;
+}
+
+export type VendorLevel =
+  | "operational"
+  | "degraded"
+  | "partial_outage"
+  | "major_outage"
+  | "maintenance"
+  | "unknown";
+
+export interface VendorStatusDTO {
+  key: string;
+  name: string;
+  statusPageUrl: string;
+  level: VendorLevel;
+  description: string;
+  indicator: string | null;
+  updatedAt: string | null;
+  incidents: VendorIncidentDTO[];
+  ok: boolean;
+}
+
+export interface VendorStatusResponse {
+  fetchedAt: string;
+  vendors: VendorStatusDTO[];
+}
+
 export interface InstallationsResponse {
   installations: { id: number; accountLogin: string; repoSelection: string }[];
   installUrl: string | null;
@@ -141,6 +174,7 @@ export const api = {
 
   jobs: () => req<JobDTO[]>("/api/jobs"),
   usage: () => req<UsageSummary>("/api/usage/summary"),
+  vendorStatus: () => req<VendorStatusResponse>("/api/vendor-status"),
 
   pulls: () => req<PullRequestDTO[]>("/api/pulls"),
   syncPulls: () =>

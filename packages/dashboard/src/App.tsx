@@ -11,18 +11,28 @@ import {
   type RunnerDTO,
   type TemplateDTO,
   type UsageSummary,
+  type VendorStatusResponse,
 } from "./api.js";
 import { SizeSwitcher } from "./SizeSwitcher.js";
 import { ThemeSwitcher } from "./ThemeSwitcher.js";
-import { Badge, JobBadge, Panel, ReviewStatusBadge } from "./ui.js";
+import { Badge, JobBadge, Panel, ReviewStatusBadge, VendorStatusBadge } from "./ui.js";
 
-type Tab = "repos" | "templates" | "prompts" | "pulls" | "runners" | "activity" | "usage";
+type Tab =
+  | "repos"
+  | "templates"
+  | "prompts"
+  | "pulls"
+  | "runners"
+  | "status"
+  | "activity"
+  | "usage";
 const TAB_LABELS: Record<Tab, string> = {
   repos: "Repositories",
   templates: "Review Templates",
   prompts: "System Prompts",
   pulls: "Pull Requests",
   runners: "Runners",
+  status: "Service Status",
   activity: "Activity",
   usage: "Usage & spend",
 };
@@ -32,10 +42,20 @@ const NAV_GLYPH: Record<Tab, string> = {
   prompts: "✎",
   pulls: "⇄",
   runners: "◇",
+  status: "◉",
   activity: "◷",
   usage: "$",
 };
-const ORDER: Tab[] = ["repos", "templates", "prompts", "pulls", "runners", "activity", "usage"];
+const ORDER: Tab[] = [
+  "repos",
+  "templates",
+  "prompts",
+  "pulls",
+  "runners",
+  "status",
+  "activity",
+  "usage",
+];
 
 export function App() {
   const [login, setLogin] = useState<string | null>(null);
@@ -95,6 +115,7 @@ export function App() {
           {tab === "prompts" && <PromptsPanel />}
           {tab === "pulls" && <PullsPanel />}
           {tab === "runners" && <RunnersPanel />}
+          {tab === "status" && <ServiceStatusPanel />}
           {tab === "activity" && <ActivityPanel />}
           {tab === "usage" && <UsagePanel />}
         </Panel>
@@ -690,6 +711,100 @@ function RunnersPanel() {
               <tr>
                 <td colSpan={5} className="dim">
                   No runners enrolled.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function ServiceStatusPanel() {
+  const { data, error, loading, reload } = useAsync<VendorStatusResponse>(
+    () => api.vendorStatus(),
+    [],
+  );
+  // Vendor status changes on the order of minutes; poll slower than the infra
+  // panels (and the control plane caches for ~60s, so this won't hit upstream).
+  useEffect(() => {
+    const t = setInterval(reload, 60000);
+    return () => clearInterval(t);
+  }, [reload]);
+
+  return (
+    <>
+      <div className="panel-head">
+        <span className="dim">
+          Live status of the external services this control plane depends on.
+        </span>
+        <button
+          type="button"
+          size-="small"
+          variant-="background2"
+          onClick={reload}
+          disabled={loading}
+        >
+          {loading ? "…" : "⟳ Refresh"}
+        </button>
+      </div>
+      {data?.fetchedAt && (
+        <p className="panel-desc">Checked {new Date(data.fetchedAt).toLocaleTimeString()}.</p>
+      )}
+      {error && <div className="repo-msg">Error: {error}</div>}
+      <div className="table-wrap">
+        <table className="tbl" divide-="horizontal">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th className="nowrap">Status</th>
+              <th>Details</th>
+              <th className="nowrap">Updated</th>
+              <th className="nowrap" />
+            </tr>
+          </thead>
+          <tbody>
+            {data?.vendors.map((v) => (
+              <tr key={v.key}>
+                <td>{v.name}</td>
+                <td className="nowrap">
+                  <VendorStatusBadge level={v.level} />
+                </td>
+                <td>
+                  <span className="dim">{v.description}</span>
+                  {v.incidents.length > 0 && (
+                    <ul className="incidents">
+                      {v.incidents.map((inc) => (
+                        <li key={inc.name}>
+                          <strong>{inc.impact}</strong> · {inc.name}{" "}
+                          <span className="dim">({inc.status})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
+                <td className="dim nowrap">
+                  {v.updatedAt ? new Date(v.updatedAt).toLocaleTimeString() : "—"}
+                </td>
+                <td className="nowrap">
+                  <a href={v.statusPageUrl} target="_blank" rel="noreferrer">
+                    view ↗
+                  </a>
+                </td>
+              </tr>
+            ))}
+            {!data && !error && (
+              <tr>
+                <td colSpan={5} className="dim">
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {data && !data.vendors.length && (
+              <tr>
+                <td colSpan={5} className="dim">
+                  No services configured.
                 </td>
               </tr>
             )}
