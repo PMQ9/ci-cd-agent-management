@@ -22,4 +22,7 @@ logs/
 # OS / editor
 .DS_Store
 .idea/
-.vscode/
+.vscode/*
+# …but share the local prod-preview "debug button" (see scripts/preview-web.mjs)
+!.vscode/launch.json
+!.vscode/tasks.json

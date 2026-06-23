@@ -16,6 +16,8 @@
     "dev:cp": "pnpm --filter @agentpr/control-plane dev",
     "dev:runner": "pnpm --filter @agentpr/runner dev",
     "dev:dash": "pnpm --filter @agentpr/dashboard dev",
+    "preview:web": "node scripts/preview-web.mjs",
+    "preview:web:build": "node scripts/preview-web.mjs --build",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose stop postgres",
     "db:generate": "pnpm --filter @agentpr/control-plane db:generate",

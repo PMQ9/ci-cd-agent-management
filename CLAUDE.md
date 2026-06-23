@@ -125,6 +125,9 @@ pnpm db:up                 # Postgres in Docker
 pnpm db:generate           # regenerate drizzle/*.sql after editing db/schema.ts
 pnpm db:migrate            # apply migrations manually (also auto-runs on control-plane boot)
 pnpm dev:cp | dev:dash | dev:runner
+pnpm preview:web           # local prod-preview: build dashboard + control plane serves it
+                           # on :8080 same-origin (like Cloud Run), to debug before pushing.
+                           # scripts/preview-web.mjs; also VS Code "Debug Web (local prod-preview)".
 ```
 
 After editing `db/schema.ts`, **always** `pnpm db:generate` and commit the new

@@ -1,0 +1,47 @@
+{
+  // The "debug button" — pick a config in the Run & Debug panel (Cmd-Shift-D).
+  //   "Debug Web (local prod-preview)"  builds the dashboard as a production bundle
+  //   and serves it via the control plane on :8080, exactly like Cloud Run, so you
+  //   can debug the real built site before pushing to the web.
+  //
+  // NOTE on runtimeExecutable / env.PATH: GUI-launched VS Code does NOT inherit your
+  // shell PATH, so it can't find Homebrew's `node` (nor the `pnpm`/`docker`/`open`
+  // the launcher spawns). We point at node explicitly and prepend the standard bin
+  // dirs (Apple-Silicon `/opt/homebrew/bin`, Intel/Docker `/usr/local/bin`). If your
+  // node lives elsewhere, run `which node` and update "runtimeExecutable".
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Web (local prod-preview)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/preview-web.mjs",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "runtimeExecutable": "/opt/homebrew/bin/node",
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${env:PATH}"
+      },
+      "skipFiles": ["<node_internals>/**"],
+      "presentation": { "group": "web", "order": 1 }
+    },
+    {
+      "name": "Open Web in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/packages/dashboard",
+      "presentation": { "group": "web", "order": 2 }
+    }
+  ],
+  "compounds": [
+    {
+      // One click: boots the local prod-preview AND opens Chrome against it.
+      // Chrome retries the connection for a few seconds while the server boots.
+      "name": "Debug Web + Chrome",
+      "configurations": ["Debug Web (local prod-preview)", "Open Web in Chrome"],
+      "stopAll": true,
+      "presentation": { "group": "web", "order": 0 }
+    }
+  ]
+}

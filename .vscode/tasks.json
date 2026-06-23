@@ -1,0 +1,17 @@
+{
+  // Terminal → Run Task… → "Preview Web (local prod build)" for a non-debugger run.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Preview Web (local prod build)",
+      "detail": "Build the dashboard + serve it via the control plane on :8080 (like Cloud Run)",
+      "type": "shell",
+      "command": "node scripts/preview-web.mjs",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "group": "build"
+    }
+  ]
+}

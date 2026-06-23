@@ -46,6 +46,22 @@ pnpm dev:runner            # runner       → enrolls + polls for jobs
 In the dashboard, click **Dev login** (local only). Connecting real repos needs a GitHub
 App — see the deploy guides below.
 
+### Preview the deployed site locally (before pushing)
+
+`dev:dash` is hot-reload dev mode (Vite on `:5173`, API proxied). To debug the site **as
+Cloud Run actually serves it** — production bundle, single origin, SPA fallback, pre-paint
+theme script — run the one-command prod-preview instead:
+
+```bash
+pnpm preview:web           # builds the dashboard + serves it via the control plane on :8080
+```
+
+It starts Postgres (Docker), builds the dashboard (rebuilds on save), boots the control
+plane with `DASHBOARD_DIST` set, waits for `/health`, and opens the browser. Ctrl-C stops
+everything. In VS Code it's also a click: **Run & Debug → "Debug Web (local prod-preview)"**.
+Flags: `--build` (compile the control plane too, max fidelity), `--no-watch`, `--no-db`,
+`--no-open`.
+
 ## Deploy
 
 - **Control plane → GCP Cloud Run** (scale-to-zero ~$0, managed HTTPS, no IP/domain) **+
