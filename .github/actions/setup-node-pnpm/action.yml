@@ -26,7 +26,7 @@ runs:
     - name: Set up Node
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
-        node-version: 22 # matches the Dockerfile (node:22-slim); engines >=20
+        node-version: 24 # matches the Dockerfile (node:24-slim); engines >=20
         cache: pnpm
 
     # esbuild's postinstall is pre-approved via pnpm-workspace.yaml `allowBuilds`,
