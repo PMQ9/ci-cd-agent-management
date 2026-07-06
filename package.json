@@ -28,18 +28,18 @@
     "db:migrate": "pnpm --filter @agentpr/control-plane db:migrate"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.1",
-    "@electric-sql/pglite": "^0.5.3",
+    "@biomejs/biome": "2.5.2",
+    "@electric-sql/pglite": "^0.5.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^6.0.3",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.10",
     "jsdom": "^29.1.1",
     "tsup": "^8.3.5",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
